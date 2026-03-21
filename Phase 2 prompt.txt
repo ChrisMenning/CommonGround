@@ -1,0 +1,470 @@
+You are helping build **CommonGround**, a civic community intelligence platform. Phase 1 is complete. You are beginning Phase 2. Before writing any code, internalize this full project context — it supersedes Phase 1 prompt.txt where the two conflict.
+
+---
+
+## What CommonGround Is
+
+CommonGround is a map-based, open-source community intelligence tool that layers public data sources to surface actionable insights for mutual aid networks, tenant advocates, neighborhood associations, food access organizers, environmental justice advocates, and community organizers. It is built *for* communities, not institutions.
+
+**It is not a surveillance tool.** It is a community nervous system — the capacity to sense what is happening, share awareness laterally, and coordinate response.
+
+---
+
+## Core Non-Negotiables (Unchanged from Phase 1)
+
+1. **No individual tracking.** All data surfaces at aggregate level (census tract or zip code minimum). The architecture enforces this technically — raw individual-level records never touch the application database.
+2. **No data sales or sharing with law enforcement, immigration enforcement, or any extractive actor.**
+3. **No dark patterns, engagement optimization, or advertising. Ever.**
+4. **All correlations are labeled as correlations.** Causal claims require primary source evidence. Uncertainty is always named. Every alert carries an explicit claim type: `CORRELATION`, `MECHANISM`, or `DOCUMENTED`.
+5. **AGPL-3.0 licensed.** All modifications must remain open source.
+6. **Designed for self-hosting and federation.** No proprietary dependencies.
+
+---
+
+## Tech Stack
+
+- **Backend:** Node.js + Express + PostGIS (PostgreSQL with spatial extension)
+- **Frontend:** MapLibre GL JS v4 (bundled locally via esbuild — no CDN dependency)
+- **Tile style:** OpenFreeMap Liberty — fonts available: `Noto Sans Regular`, `Noto Sans Italic`, `Noto Sans Bold` ONLY. Using any other font name in a symbol layer causes async glyph 404s that wipe all dynamically-added layers.
+- **Data pipelines:** Node.js ingestion scripts in `/ingest/seeds/`
+- **Deployment:** Docker Compose (single compose file: `docker/docker-compose.yml`)
+- **Repo:** Public GitHub, AGPL-3.0
+
+**Design language:** Solarpunk brutalism — warm earth tones (`#1A1208` soil, `#2D1F0E` bark, `#5A7A32` leaf, `#7FA843` sprout, `#D4A017` amber), Courier New for labels/UI chrome, Georgia for body text. Dark theme.
+
+**Critical deployment note:** Always use `docker compose -f docker/docker-compose.yml up -d --build <service>` from the project root. Do NOT use `docker-compose.dev.yml` — it overrides the nginx stage with the builder stage, removing the HTTP server.
+
+---
+
+## Project Structure (Monorepo)
+
+```
+/api          — Express backend (Node.js + Express + PostGIS)
+/frontend     — MapLibre app (built with esbuild via build.js)
+/ingest       — Data pipeline scripts (seeds/ + signal engine)
+/docs         — Architecture, decision log, data registry
+/docker       — Docker Compose files + Dockerfiles + nginx.conf
+/project-governance — Alert specs and governance documents
+```
+
+---
+
+## Phase 1 — COMPLETE
+
+All of the following are working and deployed:
+
+### Data Layers (10 active)
+
+| Slug | Description | Count | Aggregation |
+|---|---|---|---|
+| `ejscreen` | EPA EJScreen pollution burden | 177 | block_group |
+| `svi` | CDC Social Vulnerability Index | 58 | tract |
+| `food-access` | USDA Food Access Research Atlas (LILA tracts) | 51 | tract |
+| `hud-chas` | HUD housing cost burden | 58 | tract |
+| `eviction-lab` | Eviction filing rates (Eviction Lab) | 51 | tract |
+| `fqhc` | HRSA Federally Qualified Health Centers | 18 | point |
+| `snap-retailers` | Authorized SNAP retailers | 184 | point |
+| `airnow` | EPA AirNow hourly AQI | 1 | point |
+| `osm-resources` | OpenStreetMap community infrastructure | 97 | point |
+| `neighborhood-assoc` | Neighborhood association boundaries + labels | 52 | neighborhood |
+
+### Database Schema (Current)
+
+```sql
+layers (
+  id SERIAL PRIMARY KEY,
+  slug TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  source_url TEXT,
+  trust_rating INTEGER CHECK (trust_rating BETWEEN 1 AND 5),
+  claim_type TEXT CHECK (claim_type IN ('DOCUMENTED','MECHANISM','CORRELATION')),
+  update_frequency TEXT,
+  data_vintage TEXT,        -- added Phase 1
+  created_at TIMESTAMPTZ DEFAULT NOW()
+)
+
+features (
+  id SERIAL PRIMARY KEY,
+  layer_id INTEGER REFERENCES layers(id),
+  geom GEOMETRY(Geometry, 4326) NOT NULL,
+  properties JSONB NOT NULL DEFAULT '{}',
+  aggregation_level TEXT CHECK (aggregation_level IN
+    ('tract','block_group','zip','county','neighborhood','point')),
+  last_updated TIMESTAMPTZ DEFAULT NOW()
+)
+
+alerts (
+  id SERIAL PRIMARY KEY,
+  alert_type TEXT NOT NULL,
+  claim_type TEXT NOT NULL CHECK (claim_type IN ('DOCUMENTED','MECHANISM','CORRELATION')),
+  severity TEXT NOT NULL CHECK (severity IN ('T1','T2','T3')),
+  title TEXT NOT NULL,
+  description TEXT,
+  trigger_conditions JSONB,
+  affected_geom GEOMETRY(Geometry, 4326),
+  recommendation TEXT,
+  caution TEXT,
+  sources TEXT[],
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ
+)
+
+resources (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT,
+  address TEXT,
+  lat DOUBLE PRECISION,
+  lon DOUBLE PRECISION,
+  phone TEXT,
+  hours TEXT,
+  notes TEXT,
+  approved BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+)
+```
+
+**Minimum geometry is census tract.** No parcel-level or address-level storage.
+
+### API Endpoints (All working)
+
+```
+GET  /layers                          — list layers with metadata + data_vintage
+GET  /features?layer=X&bbox=W,S,E,N  — GeoJSON features in bbox
+GET  /alerts?bbox=W,S,E,N&severity=X — active alerts for area
+GET  /weather?lat=X&lon=Y             — NWS conditions + alerts
+POST /resources                       — submit community resource
+```
+
+### Frontend (All working)
+
+- MapLibre map centered on Green Bay, WI
+- Layer toggle panel with data vintage display in sidebar
+- NWS weather conditions + severe weather alerts
+- Alert sidebar polled every 5 minutes (alert map markers + sidebar list already implemented)
+- Community resource submission form
+
+---
+
+## Phase 2 — Scope
+
+Phase 2 builds the **intelligence layer** on top of the Phase 1 data foundation. The primary deliverable is a working cross-layer signal engine that fires all 9 planned alerts automatically. Secondary deliverables are 6 new data sources, a lightweight resource moderation UI, and an ActivityPub federation design document.
+
+### Constraints for Phase 2
+
+- **All 9 alerts** are in scope (T1-H01 through T3-R01)
+- **CCAP is blocked** — T1-H01 (Mass Eviction) is partially stubbed; full implementation blocked until legal review of Wisconsin court record scraping is complete. Document as blocked in `docs/CCAP-LEGAL-REVIEW.md`.
+- **ActivityPub**: architecture design document only — no implementation. Produce `docs/ACTIVITYPUB-DESIGN.md`.
+- **Moderation UI**: in scope but secondary to the alert engine
+- **New data sources**: all planned sources listed below
+
+---
+
+## Alert System — Full Specification
+
+See `project-governance/commonground-planned-alerts-v01.txt` for the complete alert specs. Summary:
+
+**Claim types:**
+- `DOCUMENTED` — primary source evidence of a specific actor/event; direct language permitted
+- `MECHANISM` — correlation + plausible causal pathway supported by external research
+- `CORRELATION` — co-occurrence pattern; use "associated with," never "causes"
+
+### All 9 Alerts
+
+| Alert ID | Name | Tier | Claim Type | Phase 1 data sufficient? | Blocker |
+|---|---|---|---|---|---|
+| T1-H01 | Mass Eviction Filing | T1 | DOCUMENTED | ❌ | CCAP — legal review required |
+| T1-E01 | Severe Weather + High Vulnerability | T1 | MECHANISM | ✅ | None — implementable now |
+| T1-F01 | Community Fridge Critical Need | T1 | DOCUMENTED | ❌ | FreeFridges/211 WI source needed |
+| T2-H01 | Compounding Displacement Pressure | T2 | CORRELATION | ❌ | Needs gb-permits + zip-level Eviction Lab |
+| T2-F01 | Food Access Gap | T2 | CORRELATION | ✅ | None — implementable now (ST_DWithin) |
+| T2-C01 | Civic Action Window | T2 | DOCUMENTED | ❌ | Needs GB municipal portal scraper |
+| T2-ENV01 | Environmental Burden + Vulnerability | T2 | MECHANISM | ✅ | None — implementable now |
+| T3-S01 | Assembly Safety Briefing | T3 | DOCUMENTED | ❌ | Needs gb-permits |
+| T3-I01 | Surveillance Infrastructure Density | T3 | DOCUMENTED | ❌ | Needs DeFlock |
+| T3-R01 | Mutual Aid Gap | T3 | CORRELATION | ❌ | Needs MutualAidHub |
+
+### Alert Trigger Conditions (Summary)
+
+**T1-H01 — BLOCKED (CCAP)**
+- Trigger: 5+ CCAP filings by same plaintiff in 30-day window, same building or block
+- Proxy for Phase 2: manual admin insert; Eviction Lab can indicate elevated county baseline
+- Create `ingest/signals/t1-h01.js` with a clear `// BLOCKED: CCAP pending legal review` comment
+
+**T1-E01 — Severe Weather + High Vulnerability**
+- Trigger: Active NWS Tier 3+ alert for area where SVI > 0.75
+- Implementation: query NWS alerts API → spatial join with SVI features → fire if any tract SVI > 0.75
+
+**T1-F01 — Community Fridge Critical Need**
+- Trigger: Self-reported critical status from FreeFridges/211 WI, or 72h since last confirmation
+- Requires: FreeFridges API or 211 WI integration (`ingest/seeds/free-fridges.js`)
+- Fallback: if no machine-readable API exists, provide manual admin trigger path
+
+**T2-H01 — Compounding Displacement Pressure**
+- Trigger: Eviction filings up >10% QoQ AND renovation permits up >15% YoY in same zip code
+- Requires: gb-permits seed + zip-level Eviction Lab data (current ingest is county-level)
+
+**T2-F01 — Food Access Gap**
+- Trigger: LILA-flagged tract (`lila_flag = 1`) with no active food resource (pantry/retailer/community fridge) within 1.0 mile
+- Implementation: ST_DWithin query joining food-access layer with snap-retailers + osm-resources
+
+**T2-C01 — Civic Action Window**
+- Trigger: Public comment period opened on permit or rezoning in a high-stress area (SVI > 0.6)
+- Requires: Green Bay municipal portal scraper or OpenStates Wisconsin integration
+- May be partially manual in Phase 2 (admin-only insert) if scraper isn't feasible
+
+**T2-ENV01 — Environmental Burden + Vulnerability**
+- Trigger: Tract in top quartile for both EJScreen composite score AND SVI score
+- Implementation: Percentile rank query across ejscreen + svi features; CDC PLACES adds optional health context
+- Core trigger implementable with Phase 1 data; PLACES enriches description only
+
+**T3-S01 — Assembly Safety Briefing**
+- Trigger: Permitted public assembly event within 48 hours in current map view
+- Components: weather (NWS) + AQI (AirNow) + nearest FQHC compiled into briefing
+- Requires: Green Bay building/assembly permit feed (same source as gb-permits; check if assembly permits are in same dataset)
+
+**T3-I01 — Surveillance Infrastructure Density**
+- Trigger: Area contains 3+ confirmed ALPR cameras within 0.5 mile radius
+- Requires: DeFlock ALPR data (`ingest/seeds/defloc-alpr.js`)
+- Frontend trigger: on map moveend or bbox change (like other layer queries)
+
+**T3-R01 — Mutual Aid Gap**
+- Trigger: SVI > 0.75 tract with no active mutual aid resource within 1.5 miles
+- Requires: MutualAidHub integration (`ingest/seeds/mutual-aid-hub.js`)
+- Implementation: ST_DWithin query joining SVI features with osm-resources + mutual-aid-hub layer
+
+Every alert popup must display: claim type badge, data sources cited, epistemic caution text, recommended action, and last evaluated timestamp.
+
+---
+
+## Phase 2A — New Data Sources
+
+These seed scripts must be created. Follow the existing pattern in `ingest/seeds/*.js` — each file has a CONFIG block at the top for easy maintenance.
+
+| Source | Slug | Needed for | Notes |
+|---|---|---|---|
+| Green Bay building/renovation permits | `gb-permits` | T2-H01, T3-S01 | City of GB open data portal; aggregate to block group |
+| FEMA National Flood Hazard Layer | `fema-flood` | T2-ENV01 enrichment | FEMA NFHL REST API; polygon layer |
+| CDC PLACES (health outcomes by tract) | `cdc-places` | T2-ENV01 enrichment | HHHS/CDC open API; tract-level health measures |
+| DeFlock ALPR camera locations | `defloc-alpr` | T3-I01 | Community-sourced; point layer; evaluate API availability |
+| HMDA mortgage data | `hmda` | T2-H01 context | Tract-level denial rates; CFPB public API |
+| Property ownership / LLC networks | `property-llc` | T1-H01, T2-H01 | Brown County Assessor export; aggregate landlord footprint to block group |
+| FreeFridges / Little Free Pantry | `free-fridges` | T1-F01 | Evaluate machine-readable API; fallback to 211 WI |
+| MutualAidHub | `mutual-aid-hub` | T3-R01 | Community directory; trust_rating=2 |
+| OpenStates Wisconsin | `openstates` | T2-C01 context | WI bills/votes; use OpenStates API |
+
+**Schema note:** All new sources use the existing `features` table. Aggregation levels needed: `'block_group'` (HMDA, gb-permits), `'point'` (DeFlock, free-fridges), `'tract'` (PLACES, fema-flood), `'neighborhood'` (mutual-aid-hub if zone-level). All are already in the CHECK constraint.
+
+---
+
+## Phase 2B — Signal Engine
+
+Create a scheduled evaluation engine that queries DB state and writes computed alerts.
+
+### Architecture
+
+```
+ingest/signal-engine.js           — runner: loads all signal modules, runs on schedule
+ingest/signals/t1-h01.js          — BLOCKED stub
+ingest/signals/t1-e01.js
+ingest/signals/t1-f01.js
+ingest/signals/t2-h01.js
+ingest/signals/t2-f01.js
+ingest/signals/t2-c01.js
+ingest/signals/t2-env01.js
+ingest/signals/t3-s01.js
+ingest/signals/t3-i01.js
+ingest/signals/t3-r01.js
+```
+
+### Signal Module Interface
+
+Each module exports:
+
+```js
+module.exports = {
+  alertType: 'T2-F01',          // string ID
+  schedule: '0 * * * *',        // cron expression
+  evaluate: async function(db)  // returns Array<AlertRow> or []
+}
+```
+
+### Alert Upsert Logic
+
+- Match existing active alert by `(alert_type, ST_Equals(affected_geom, new_geom))` — update `trigger_conditions` + `expires_at` if exists; insert new row if not
+- Expire rows whose conditions are no longer met (set `expires_at = NOW()`)
+- Degrade gracefully if source data unavailable (log warning, return [])
+
+### Schedule (by tier)
+
+- T1 signals: every 15 minutes
+- T2 signals: every 1 hour
+- T3 signals: every 6 hours
+
+### DB Migration (add to schema.sql)
+
+```sql
+CREATE TABLE IF NOT EXISTS signal_runs (
+  id          SERIAL PRIMARY KEY,
+  alert_type  TEXT NOT NULL,
+  run_at      TIMESTAMPTZ DEFAULT NOW(),
+  triggered   INTEGER DEFAULT 0,
+  expired     INTEGER DEFAULT 0,
+  error       TEXT
+);
+```
+
+---
+
+## Phase 2C — Alert Frontend Enhancements
+
+Phase 1 already has: alert sidebar, map point markers, 5-minute polling.
+
+Phase 2 adds:
+- **Alert detail popup:** claim type badge, data sources cited, epistemic caution text, recommended action, trigger condition values ("Why is this firing?"), last evaluated timestamp
+- **Polygon overlay:** `affected_geom` rendered as a GeoJSON fill layer, not just a point marker
+- **Tier/severity filtering:** dropdown or button group in alert sidebar to filter by T1/T2/T3
+- **Alert count badge** on the sidebar toggle button
+
+---
+
+## Phase 2D — Resource Moderation UI
+
+Currently all submitted resources have `approved = false` and require manual psql to approve.
+
+Phase 2 adds a minimal admin UI:
+
+### New API Endpoints
+
+```
+GET  /admin/resources              — list pending (approved=false) submissions
+POST /admin/resources/:id/approve  — set approved=true, geocode if lat/lon absent, add to features
+POST /admin/resources/:id/reject   — delete submission
+```
+
+### Auth (Phase 2)
+
+Simple shared secret: `Authorization: Bearer <ADMIN_SECRET>` header (env var).
+No full auth system — that is Phase 3. Localhost-only acceptable as fallback.
+
+### UI
+
+Minimal static HTML page at `/admin` served by the API container. No framework. Consistent with existing frontend design language.
+
+---
+
+## Phase 2E — ActivityPub Design Document
+
+No implementation. Produce `docs/ACTIVITYPUB-DESIGN.md` covering:
+
+1. **Identity model** — each CommonGround instance as an ActivityPub Actor
+2. **What gets federated** — alert publications as Activities (Create, Update, Delete)
+3. **What does NOT federate** — features, user-submitted resources (privacy)
+4. **Discovery** — instance registry approach (NodeInfo)
+5. **Threat model** — spam alerts, impersonation, data provenance / source integrity
+6. **Consent model** — subscription-based federation (instances opt in to receive alerts from peers)
+7. **Reference implementations** — Mastodon (ActivityPub), NodeInfo spec
+
+---
+
+## CCAP Legal Review (Blocked)
+
+File: `docs/CCAP-LEGAL-REVIEW.md`
+
+Document:
+- What CCAP is (Wisconsin Circuit Court Access Program — public court record portal)
+- What CommonGround would use it for (T1-H01: bulk eviction filing detection by plaintiff)
+- Legal questions: Wisconsin statute 758.20, CCAP ToS on automated access, EPIC analysis of court record scraping
+- Open questions to resolve before unblocking
+- Contact: Wisconsin Judicare, ACLU WI, local legal aid
+
+T1-H01 evaluator (`ingest/signals/t1-h01.js`) must exist but must begin with:
+```js
+// BLOCKED: CCAP integration requires legal review before activation.
+// See docs/CCAP-LEGAL-REVIEW.md
+// This module will return [] until unblocked.
+```
+
+---
+
+## Recommended Implementation Order
+
+1. **Phase 2A** — New data sources (start with `gb-permits`, `cdc-places`, `defloc-alpr`)
+   - HMDA and `property-llc` are more complex; can follow
+   - `free-fridges` and `mutual-aid-hub` depend on API availability research
+2. **Phase 2B scaffold** — signal-engine runner + upsert logic
+3. **First 3 signals** — T1-E01, T2-F01, T2-ENV01 (all use Phase 1 data; no new sources needed)
+4. **Remaining signals** as sources land: T2-H01 → T3-S01 → T3-I01 → T3-R01 → T1-F01 → T2-C01
+5. **T1-H01 stub** — blocked module with documentation
+6. **Phase 2C** — alert frontend enhancements
+7. **Phase 2D** — resource moderation UI
+8. **Phase 2E** — ActivityPub design document (can be written at any point)
+
+---
+
+## Files to Create
+
+```
+ingest/seeds/gb-permits.js
+ingest/seeds/fema-flood.js
+ingest/seeds/cdc-places.js
+ingest/seeds/defloc-alpr.js
+ingest/seeds/hmda.js
+ingest/seeds/property-llc.js
+ingest/seeds/free-fridges.js
+ingest/seeds/mutual-aid-hub.js
+ingest/seeds/openstates.js
+ingest/signal-engine.js
+ingest/signals/t1-h01.js  (BLOCKED stub)
+ingest/signals/t1-e01.js
+ingest/signals/t1-f01.js
+ingest/signals/t2-h01.js
+ingest/signals/t2-f01.js
+ingest/signals/t2-c01.js
+ingest/signals/t2-env01.js
+ingest/signals/t3-s01.js
+ingest/signals/t3-i01.js
+ingest/signals/t3-r01.js
+api/src/routes/admin.js
+frontend/src/admin.js
+docs/ACTIVITYPUB-DESIGN.md
+docs/CCAP-LEGAL-REVIEW.md
+```
+
+## Files to Modify
+
+```
+api/schema.sql              — signal_runs table
+api/src/index.js            — register admin route
+frontend/src/alerts.js      — detail popup, polygon overlay, filtering
+frontend/index.html         — admin page route
+ingest/run-all.js           — add new auto-fetch seeds
+docs/ARCHITECTURE.md        — signal engine section
+docs/DATA-REGISTRY.md       — new source entries
+```
+
+---
+
+## Open Questions to Resolve Before Starting
+
+1. **FreeFridges API** — Does FreeFridges.net or the Wisconsin network have a machine-readable endpoint? If not, T1-F01 needs a different trigger source (211 WI API).
+2. **Green Bay permit portal** — Is there an open data API, or does it require scraping/CSV export? Determine before writing the seed script.
+3. **Eviction Lab zip-level data** — Current ingest uses county-level data. T2-H01 requires zip-code-level eviction rates. Does Eviction Lab publish zip-level in their full dataset?
+4. **CCAP legal review** — Who is conducting it, and what is the timeline? T1-H01 is fully blocked until this is resolved.
+5. **MutualAidHub API** — Is there a public machine-readable endpoint? Required for T3-R01.
+6. **Moderation auth** — Is `ADMIN_SECRET` shared-secret header acceptable for Phase 2, or is additional IP restriction needed?
+7. **DeFlock API** — Is DeFlock's ALPR data available via API or bulk download? Evaluate trust rating (1–3 likely; community-sourced).
+
+---
+
+## Key Lessons from Phase 1 (Don't Repeat)
+
+- **MapLibre font names:** OpenFreeMap Liberty only provides `Noto Sans Regular`, `Noto Sans Italic`, `Noto Sans Bold`. Any other font name in a symbol `text-font` array causes async glyph 404 errors that trigger MapLibre's internal error handler and silently wipe ALL dynamically-added layers (fill, outline, and label layers). Always look up available fonts from the Liberty style JSON before adding symbol layers.
+- **Docker compose:** Always use `docker compose -f docker/docker-compose.yml ...` from the project root. The dev overlay (`docker-compose.dev.yml`) breaks the nginx stage.
+- **Data vintage:** `layers.data_vintage TEXT` column exists (added Phase 1). Populate it in all new seed scripts.
+- **Ingest pattern:** Each seed script uses a `const CONFIG = { ... }` block at the top for all configurable values (URLs, layer name, slugs, etc.). Follow this pattern for all Phase 2 seeds.
+
+---
+
+You now have full Phase 1 + Phase 2 context. Begin with Phase 2A data sources unless I direct otherwise. Ask clarifying questions only if a decision would meaningfully affect the architecture or data trust model — otherwise default to the most privacy-protective, community-aligned interpretation.

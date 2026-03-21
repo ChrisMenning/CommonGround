@@ -1,0 +1,187 @@
+**CommonGround**
+
+*Planned Alerts*
+
+v0.1  ·  March 2026
+
+*This document defines the alert taxonomy for CommonGround. Each alert carries an explicit claim type, confidence level, and epistemic caution in accordance with the Guiding Principles Section V. Alerts are not conclusions — they are invitations to investigate and act.*
+
+# Claim Type Reference
+
+- CORRELATION — These conditions tend to co-occur. We do not know why. Use language: 'is associated with,' 'tends to precede,' 'co-occurs with.'
+
+- MECHANISM — Correlation with a plausible causal pathway supported by external research. We can speak with more confidence but must name the research basis and local limitation.
+
+- DOCUMENTED — Primary source evidence of a specific actor or event in this place at this time. Direct language permitted.
+
+# Tier 1: Immediate Action
+
+High-confidence signals requiring rapid community response. Reserved for documented events or strong mechanism-based patterns.
+
+## Alert T1-H01: Mass Eviction Filing Event
+
+| **Field** | **Detail** |
+| --- | --- |
+| Alert ID | T1-H01 |
+| Claim type | DOCUMENTED |
+| Severity tier | Tier 1 — Immediate |
+| Primary sources | Wisconsin CCAP, Eviction Lab |
+| Trigger condition | 5+ eviction filings by the same plaintiff within a 30-day window in a single building or block |
+
+**What the data shows: **A specific landlord or property management company has filed multiple evictions in a concentrated area and time window. This pattern is associated with coordinated displacement strategy.
+
+**Recommended action: **Connect affected tenants with legal aid (NLG, Legal Action of Wisconsin). Alert housing advocates. Document the plaintiff name for community awareness. Share Tenant Rights resources.
+
+***Epistemic caution: ****This is a documented actor pattern, not a causal inference. The filings are real. The intent behind them is not established by the data alone.*
+
+## Alert T1-E01: Severe Weather + High Vulnerability Overlap
+
+| **Field** | **Detail** |
+| --- | --- |
+| Alert ID | T1-E01 |
+| Claim type | MECHANISM |
+| Severity tier | Tier 1 — Immediate |
+| Primary sources | NWS, CDC SVI, HRSA |
+| Trigger condition | NWS Tier 3+ weather alert issued for areas with CDC SVI score above 0.75 |
+
+**What the data shows: **A severe weather event is forecast or occurring in a census tract with high social vulnerability. Research consistently shows that high-SVI populations face greater harm from the same weather event due to housing quality, access to transportation, and economic capacity to respond.
+
+**Recommended action: **Alert mutual aid networks serving the affected tracts. Surface nearest warming/cooling centers and shelters. Activate the community resource layer for the affected area. Share NWS alert language directly.
+
+***Epistemic caution: ****SVI predicts vulnerability at the aggregate level. Individuals in high-SVI tracts vary widely. This alert is a targeting tool for mutual aid, not a prediction about specific households.*
+
+## Alert T1-F01: Community Fridge Critical Need
+
+| **Field** | **Detail** |
+| --- | --- |
+| Alert ID | T1-F01 |
+| Claim type | DOCUMENTED |
+| Severity tier | Tier 1 — Immediate |
+| Primary sources | Self-reported (FreeFridges network, 211 WI) |
+| Trigger condition | A community fridge operator self-reports 'critical need' status or has not confirmed stock in 72+ hours |
+
+**What the data shows: **A free food resource has reported or appears to have a supply gap. Self-reported status is the most direct signal available.
+
+**Recommended action: **Share the fridge location and need status to mutual aid networks. Connect to nearest food pantry or food bank for restocking support. Flag for volunteer coordination.
+
+***Epistemic caution: ****Self-reported status depends on operator engagement. Unconfirmed status after 72 hours may indicate an inactive fridge, not necessarily an empty one. Verify before broadcasting widely.*
+
+# Tier 2: Emerging Pattern
+
+Cross-metric signals that suggest a developing situation. Require community attention but not immediate emergency response.
+
+## Alert T2-H01: Compounding Displacement Pressure
+
+| **Field** | **Detail** |
+| --- | --- |
+| Alert ID | T2-H01 |
+| Claim type | CORRELATION |
+| Severity tier | Tier 2 — Emerging |
+| Primary sources | Eviction Lab, USDA SNAP, Green Bay permits, HUD CHAS |
+| Trigger condition | Eviction filings up >10% quarter-over-quarter AND renovation permits up >15% year-over-year in the same zip code |
+
+**What the data shows: **Two indicators associated with neighborhood displacement are co-occurring in the same area. Historically, this combination has preceded measurable displacement in comparable neighborhoods.
+
+**Recommended action: **Alert housing advocates to increase outreach in the area. Flag for community organizing attention. Surface tenant rights resources proactively. Prepare documentation for potential public comment processes.
+
+***Epistemic caution: ****This is a correlation, not a prediction. Both indicators can rise for reasons unrelated to coordinated displacement. Do not name specific landlords or properties unless CCAP plaintiff data independently supports it.*
+
+## Alert T2-F01: Food Access Gap — Coverage Hole
+
+| **Field** | **Detail** |
+| --- | --- |
+| Alert ID | T2-F01 |
+| Claim type | CORRELATION |
+| Severity tier | Tier 2 — Emerging |
+| Primary sources | USDA Atlas, 211 WI, MutualAidHub, OSM |
+| Trigger condition | Census tract flagged as food desert with no active food pantry, mutual aid food program, or community fridge within 1.0 mile |
+
+**What the data shows: **An area with documented food access challenges has no known community food resource within reasonable walking distance. This co-occurs with higher rates of food insecurity in comparable contexts.
+
+**Recommended action: **Share gap finding with mutual aid food networks. Identify nearest active groups that might extend coverage. Flag as a community organizing opportunity — not a crisis, but a gap worth filling.
+
+***Epistemic caution: ****OSM and directory data may be incomplete. A coverage gap in the data is not the same as a coverage gap in reality. Field verification recommended before organizing response.*
+
+## Alert T2-C01: Civic Action Window — Public Comment
+
+| **Field** | **Detail** |
+| --- | --- |
+| Alert ID | T2-C01 |
+| Claim type | DOCUMENTED |
+| Severity tier | Tier 2 — Emerging |
+| Primary sources | Green Bay municipal portal, OpenStates |
+| Trigger condition | Public comment period opened on permit, rezoning, or legislation affecting an area with elevated housing stress or displacement pressure indicators |
+
+**What the data shows: **A formal public process is open that could affect community conditions in a vulnerable area. The comment window is a documented, time-limited opportunity for community input.
+
+**Recommended action: **Surface the specific proceeding, deadline, and comment mechanism. Connect to tenant organizations, neighborhood associations, and civic advocacy groups. Provide plain-language summary of what is being proposed.
+
+***Epistemic caution: ****This alert is purely informational — it documents an opportunity, not a threat. The outcome of the proceeding is not predicted by CommonGround.*
+
+## Alert T2-ENV01: Environmental Burden + Vulnerability Co-occurrence
+
+| **Field** | **Detail** |
+| --- | --- |
+| Alert ID | T2-ENV01 |
+| Claim type | MECHANISM |
+| Severity tier | Tier 2 — Emerging |
+| Primary sources | EPA EJScreen, CDC SVI, EPA AirNow |
+| Trigger condition | Census tract in top quartile for both EJScreen pollution burden and CDC SVI composite score |
+
+**What the data shows: **An area is experiencing both elevated pollution burden and high social vulnerability. Research in environmental justice consistently finds that these conditions compound each other — vulnerable populations have less capacity to avoid, adapt to, or recover from environmental harm.
+
+**Recommended action: **Surface the specific pollution factors driving the EJScreen score. Connect to environmental justice organizations. Flag for potential legal advocacy or regulatory comment. Document as baseline for tracking change over time.
+
+***Epistemic caution: ****EJScreen scores are composite and lagged. They describe structural conditions, not acute events. This alert names a chronic pattern, not a crisis.*
+
+# Tier 3: Situational Awareness
+
+Informational alerts that build community awareness without requiring immediate action.
+
+## Alert T3-S01: Assembly Safety Briefing
+
+| **Field** | **Detail** |
+| --- | --- |
+| Alert ID | T3-S01 |
+| Claim type | DOCUMENTED + CORRELATION |
+| Severity tier | Tier 3 — Informational |
+| Primary sources | NWS, Green Bay permits, HRSA, AirNow, OSM |
+| Trigger condition | Permitted public assembly event within 48 hours in current geographic view |
+
+**What the data shows: **A public assembly is permitted in the area. This briefing compiles publicly available safety-relevant information: current and forecast weather, AQI and wind direction, nearest FQHCs and urgent care, approved permit route geometry, and active mutual aid presence.
+
+**Recommended action: **Share with event participants, medic teams, and legal observers. No action required — this is a compiled briefing of already-public information.
+
+***Epistemic caution: ****All information in this briefing is public and symmetric — it is equally available to all parties. The briefing does not predict or recommend any specific action beyond awareness.*
+
+## Alert T3-I01: Surveillance Infrastructure Density
+
+| **Field** | **Detail** |
+| --- | --- |
+| Alert ID | T3-I01 |
+| Claim type | DOCUMENTED |
+| Severity tier | Tier 3 — Informational |
+| Primary sources | DeFlock, OSM |
+| Trigger condition | User enters or queries an area with 3+ confirmed ALPR or camera installations within 0.5 mile radius |
+
+**What the data shows: **This area has documented surveillance infrastructure. ALPR readers passively record license plate data. This information is presented as environmental awareness — the same way air quality or transit coverage is displayed.
+
+**Recommended action: **No action required. Informational only. Users may choose to consult EFF resources on surveillance infrastructure rights.
+
+***Epistemic caution: ****DeFlock data is community-crowdsourced and varies in accuracy. Confirmed installations are distinguished from unverified reports. This layer makes existing infrastructure visible — it does not create new surveillance.*
+
+## Alert T3-R01: Mutual Aid Gap — No Coverage
+
+| **Field** | **Detail** |
+| --- | --- |
+| Alert ID | T3-R01 |
+| Claim type | CORRELATION |
+| Severity tier | Tier 3 — Informational |
+| Primary sources | MutualAidHub, OSM, 211 WI |
+| Trigger condition | High-SVI census tract with no active mutual aid group within 1.5 miles |
+
+**What the data shows: **An area with documented social vulnerability has no known mutual aid presence. Unorganized neighbor clusters may exist nearby (OSM residential density).
+
+**Recommended action: **Flag as a community organizing opportunity. Surface resources for starting a mutual aid group. Connect to regional mutual aid networks that might extend coverage or help seed a local group.
+
+***Epistemic caution: ****Absence of a listed mutual aid group does not mean absence of informal support networks. Informal networks are real and important — they simply aren**'**t visible to CommonGround.*
