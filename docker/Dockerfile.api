@@ -1,0 +1,17 @@
+FROM node:20-alpine AS base
+WORKDIR /app
+
+# Install production dependencies
+COPY api/package.json ./
+RUN npm install --omit=dev --no-audit --no-fund
+
+# Copy source
+COPY api/src ./src
+COPY api/schema.sql ./schema.sql
+
+# Non-root user for security
+RUN addgroup -S cg && adduser -S cg -G cg
+USER cg
+
+EXPOSE 3000
+CMD ["node", "src/index.js"]

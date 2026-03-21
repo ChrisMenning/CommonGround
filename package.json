@@ -1,0 +1,19 @@
+{
+  "name": "commonground",
+  "version": "1.0.0",
+  "description": "Civic community intelligence platform",
+  "private": true,
+  "workspaces": [
+    "api",
+    "frontend",
+    "ingest"
+  ],
+  "scripts": {
+    "dev:api": "cd api && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "db:init": "cd api && npm run db:init",
+    "ingest:all": "cd ingest && node run-all.js"
+  },
+  "license": "AGPL-3.0-only"
+}

@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CommonGround — civic community intelligence for Green Bay / Brown County">
+  <!-- No analytics, no tracking, no external scripts -->
+  <title>CommonGround</title>
+
+  <!-- MapLibre GL CSS — vendored locally, no CDN -->
+  <link rel="stylesheet" href="vendor/maplibre-gl.css">
+
+  <style>
+    /* ── Design tokens: Solarpunk Brutalism ── */
+    :root {
+      --soil:          #1A1208;
+      --bark:          #2D1F0E;
+      --bark-light:    #3D2A14;
+      --leaf:          #5A7A32;
+      --sprout:        #7FA843;
+      --amber:         #D4A017;
+      --amber-dim:     #9A7210;
+      --text-primary:  #E8D5A3;
+      --text-secondary:#B8A070;
+      --text-muted:    #7A6040;
+      --border:        #4A3520;
+      --danger:        #C0392B;
+      --font-label:    'Courier New', 'Courier', monospace;
+      --font-body:     Georgia, 'Times New Roman', serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--soil);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      overflow: hidden;
+    }
+
+    /* ── Layout ── */
+    #app {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      grid-template-rows: 1fr auto;
+      height: 100vh;
+    }
+
+    #sidebar {
+      grid-column: 1;
+      grid-row: 1 / 3;
+      background: var(--bark);
+      border-right: 2px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 10;
+    }
+
+    #map-container {
+      grid-column: 2;
+      grid-row: 1;
+      position: relative;
+    }
+
+    #map {
+      width: 100%; height: 100%;
+    }
+
+    #status-bar {
+      grid-column: 2;
+      grid-row: 2;
+      background: var(--bark);
+      border-top: 1px solid var(--border);
+      padding: 4px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-label);
+      font-size: 10px;
+      color: var(--text-secondary);
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Logo ── */
+    #logo {
+      padding: 14px 16px 12px;
+      border-bottom: 2px solid var(--border);
+      font-family: var(--font-label);
+      font-size: 22px;
+      font-weight: bold;
+      letter-spacing: 0.12em;
+      color: var(--sprout);
+      line-height: 1.1;
+    }
+
+    #logo span {
+      display: block;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--text-muted);
+      margin-top: 2px;
+      text-transform: uppercase;
+    }
+
+    /* ── Sidebar sections ── */
+    .sidebar-section {
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+    }
+
+    .section-label {
+      font-family: var(--font-label);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    /* ── Layer controls ── */
+    #layer-controls {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 0;
+      scrollbar-width: thin;
+      scrollbar-color: var(--bark-light) var(--bark);
+    }
+
+    .layer-group-label {
+      font-family: var(--font-label);
+      font-size: 8px;
+      letter-spacing: 0.18em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      padding: 6px 16px 2px;
+    }
+
+    .layer-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 16px;
+      cursor: pointer;
+      font-family: var(--font-label);
+      font-size: 11px;
+      color: var(--text-secondary);
+      transition: background 0.1s;
+      user-select: none;
+    }
+
+    .layer-item:hover {
+      background: var(--bark-light);
+      color: var(--text-primary);
+    }
+
+    .layer-item.active {
+      color: var(--sprout);
+    }
+
+    .layer-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .layer-toggle {
+      width: 28px; height: 14px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--bark-light);
+      position: relative;
+      flex-shrink: 0;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .layer-toggle::after {
+      content: '';
+      position: absolute;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      top: 1px; left: 1px;
+      transition: transform 0.15s, background 0.15s;
+    }
+
+    .layer-item.active .layer-toggle {
+      background: var(--leaf);
+      border-color: var(--sprout);
+    }
+
+    .layer-item.active .layer-toggle::after {
+      transform: translateX(14px);
+      background: var(--sprout);
+    }
+
+    .trust-pip {
+      font-family: var(--font-label);
+      font-size: 8px;
+      color: var(--text-muted);
+      margin-left: auto;
+      letter-spacing: 0;
+    }
+
+    /* ── Alert panel ── */
+    #alert-panel {
+      max-height: 220px;
+      overflow-y: auto;
+      border-top: 2px solid var(--border);
+      scrollbar-width: thin;
+      scrollbar-color: var(--bark-light) var(--bark);
+    }
+
+    #alert-panel-header {
+      padding: 8px 16px 4px;
+      font-family: var(--font-label);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      position: sticky;
+      top: 0;
+      background: var(--bark);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #alert-count-badge {
+      background: var(--amber);
+      color: var(--soil);
+      border-radius: 8px;
+      padding: 1px 6px;
+      font-size: 9px;
+      font-family: var(--font-label);
+      display: none;
+    }
+
+    .alert-item {
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .alert-item:hover {
+      background: var(--bark-light);
+    }
+
+    .alert-severity-1 { border-left: 3px solid var(--danger); }
+    .alert-severity-2 { border-left: 3px solid var(--amber); }
+    .alert-severity-3 { border-left: 3px solid var(--leaf); }
+
+    .alert-title {
+      font-family: var(--font-label);
+      font-size: 11px;
+      color: var(--text-primary);
+      margin-bottom: 3px;
+    }
+
+    .alert-meta {
+      font-family: var(--font-label);
+      font-size: 9px;
+      color: var(--text-muted);
+      display: flex;
+      gap: 8px;
+    }
+
+    .claim-badge {
+      display: inline-block;
+      font-family: var(--font-label);
+      font-size: 8px;
+      letter-spacing: 0.1em;
+      padding: 1px 5px;
+      border-radius: 2px;
+      text-transform: uppercase;
+    }
+
+    .claim-DOCUMENTED  { background: var(--leaf);  color: var(--soil); }
+    .claim-MECHANISM   { background: var(--amber); color: var(--soil); }
+    .claim-CORRELATION { background: var(--bark-light); color: var(--text-secondary); border: 1px solid var(--border); }
+
+    #no-alerts-msg {
+      padding: 12px 16px;
+      font-family: var(--font-label);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    /* ── Info popup (MapLibre override) ── */
+    .maplibregl-popup-content {
+      background: var(--bark) !important;
+      color: var(--text-primary) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 3px !important;
+      max-width: 320px !important;
+      padding: 0 !important;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.6) !important;
+    }
+
+    .maplibregl-popup-tip {
+      border-top-color: var(--bark) !important;
+    }
+
+    .popup-inner {
+      padding: 12px 14px;
+    }
+
+    .popup-title {
+      font-family: var(--font-label);
+      font-size: 12px;
+      color: var(--sprout);
+      margin-bottom: 6px;
+      letter-spacing: 0.05em;
+    }
+
+    .popup-props {
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .popup-footer {
+      border-top: 1px solid var(--border);
+      padding: 8px 14px;
+      font-family: var(--font-label);
+      font-size: 9px;
+      color: var(--text-muted);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .popup-alert-caution {
+      background: var(--bark-light);
+      border-left: 3px solid var(--amber);
+      padding: 6px 10px;
+      font-size: 10px;
+      color: var(--text-secondary);
+      font-style: italic;
+      margin: 6px 0;
+    }
+
+    /* ── Loading overlay ── */
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: var(--soil);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      font-family: var(--font-label);
+      transition: opacity 0.4s;
+    }
+
+    #loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-logo {
+      font-size: 28px;
+      letter-spacing: 0.15em;
+      color: var(--sprout);
+      margin-bottom: 12px;
+    }
+
+    .loading-msg {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    /* ── Weather panel ── */
+    #weather-panel {
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      flex-shrink: 0;
+    }
+
+    #weather-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+      font-family: var(--font-label);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    #weather-nws-badge {
+      background: var(--danger);
+      color: #fff;
+      border-radius: 8px;
+      padding: 1px 6px;
+      font-size: 8px;
+      font-family: var(--font-label);
+      display: none;
+      letter-spacing: 0.05em;
+    }
+
+    #weather-current {
+      font-family: var(--font-label);
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    .weather-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .weather-icon { font-size: 13px; line-height: 1; }
+    .weather-temp { color: var(--text-primary); font-size: 12px; }
+    .weather-desc { color: var(--text-secondary); }
+    .weather-wind { font-size: 9px; color: var(--text-muted); margin-top: 2px; }
+
+    #weather-aqi {
+      margin-top: 5px;
+      padding-top: 5px;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-label);
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    .aqi-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .aqi-label {
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      color: var(--text-muted);
+    }
+
+    .aqi-value {
+      font-size: 14px;
+      font-weight: bold;
+      line-height: 1;
+    }
+
+    .aqi-category { font-size: 9px; }
+
+    .aqi-station {
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── Resource submission ── */
+    #resource-section {
+      border-top: 1px solid var(--border);
+      padding: 8px 16px;
+      flex-shrink: 0;
+    }
+
+    #resource-form-toggle {
+      width: 100%;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-family: var(--font-label);
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 5px 8px;
+      cursor: pointer;
+      border-radius: 2px;
+      text-align: left;
+      transition: background 0.1s, color 0.1s;
+    }
+
+    #resource-form-toggle:hover {
+      background: var(--bark-light);
+      color: var(--text-primary);
+    }
+
+    #resource-form {
+      margin-top: 8px;
+    }
+
+    #resource-form.hidden { display: none; }
+
+    #resource-form select,
+    #resource-form input,
+    #resource-form textarea {
+      width: 100%;
+      background: var(--bark-light);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-family: var(--font-label);
+      font-size: 10px;
+      padding: 5px 7px;
+      border-radius: 2px;
+      margin-bottom: 5px;
+      box-sizing: border-box;
+    }
+
+    #resource-form textarea {
+      resize: vertical;
+      min-height: 48px;
+      font-family: var(--font-body);
+      font-size: 10px;
+    }
+
+    #resource-form select option { background: var(--bark); }
+
+    #resource-form button[type="submit"] {
+      width: 100%;
+      background: var(--leaf);
+      border: none;
+      color: var(--soil);
+      font-family: var(--font-label);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 6px;
+      cursor: pointer;
+      border-radius: 2px;
+      transition: background 0.1s;
+    }
+
+    #resource-form button[type="submit"]:hover { background: var(--sprout); }
+
+    .form-msg {
+      font-family: var(--font-label);
+      font-size: 9px;
+      margin-top: 5px;
+      line-height: 1.4;
+    }
+
+    .form-msg-error   { color: var(--danger); }
+    .form-msg-success { color: var(--sprout); }
+
+    /* ── Navigation controls override ── */
+    .maplibregl-ctrl-group {
+      background: var(--bark) !important;
+      border: 1px solid var(--border) !important;
+    }
+
+    .maplibregl-ctrl-group button {
+      background: var(--bark) !important;
+      color: var(--text-primary) !important;
+    }
+
+    .maplibregl-ctrl-group button:hover {
+      background: var(--bark-light) !important;
+    }
+
+    .maplibregl-ctrl-attrib {
+      background: rgba(26,18,8,0.8) !important;
+      color: var(--text-muted) !important;
+      font-family: var(--font-label) !important;
+      font-size: 9px !important;
+    }
+
+    .maplibregl-ctrl-attrib a { color: var(--text-muted) !important; }
+  </style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="loading-logo">COMMON<br>GROUND</div>
+  <div class="loading-msg">Initializing community map...</div>
+</div>
+
+<div id="app">
+
+  <!-- ── Sidebar ── -->
+  <aside id="sidebar">
+    <div id="logo">
+      COMMON<br>GROUND
+      <span>Green Bay / Brown County</span>
+    </div>
+
+    <!-- ── Weather strip ── -->
+    <div id="weather-panel">
+      <div id="weather-header">
+        Weather
+        <span id="weather-nws-badge"></span>
+      </div>
+      <div id="weather-current">—</div>
+      <div id="weather-aqi">—</div>
+    </div>
+
+    <div id="layer-controls">
+      <!-- populated by layers.js -->
+      <div class="section-label" style="padding: 10px 16px 4px;">Loading layers...</div>
+    </div>
+
+    <div id="alert-panel">
+      <div id="alert-panel-header">
+        Alerts
+        <span id="alert-count-badge">0</span>
+      </div>
+      <div id="alert-list">
+        <div id="no-alerts-msg">No active alerts for this area.</div>
+      </div>
+    </div>
+
+    <!-- ── Resource submission ── -->
+    <div id="resource-section">
+      <button id="resource-form-toggle">+ Submit Resource</button>
+      <form id="resource-form" class="hidden">
+        <select name="type" required>
+          <option value="" disabled selected>Type *</option>
+          <option value="food_pantry">Food Pantry</option>
+          <option value="mutual_aid">Mutual Aid</option>
+          <option value="health_clinic">Health Clinic</option>
+          <option value="community_center">Community Center</option>
+          <option value="shelter">Shelter</option>
+          <option value="community_fridge">Community Fridge</option>
+          <option value="other">Other</option>
+        </select>
+        <input name="name"    type="text" placeholder="Name *"              required maxlength="200">
+        <input name="address" type="text" placeholder="Address *"           required maxlength="300">
+        <textarea name="description" placeholder="Description (optional)"   maxlength="1000"></textarea>
+        <input name="contact" type="text" placeholder="Contact (optional)"  maxlength="200">
+        <button type="submit">Submit for Review</button>
+      </form>
+      <div id="resource-form-msg" class="form-msg"></div>
+    </div>
+  </aside>
+
+  <!-- ── Map ── -->
+  <div id="map-container">
+    <div id="map"></div>
+  </div>
+
+  <!-- ── Status bar ── -->
+  <div id="status-bar">
+    <span id="coords">–</span>
+    <span id="status-msg">READY</span>
+    <span>CommonGround v1.0 · AGPL-3.0 · <a href="https://github.com/your-org/commonground" style="color:var(--text-muted)">source</a></span>
+  </div>
+
+</div>
+
+<!-- MapLibre GL JS — vendored, no CDN -->
+<script src="vendor/maplibre-gl.js"></script>
+<!-- App bundle -->
+<script src="app.bundle.js"></script>
+
+</body>
+</html>

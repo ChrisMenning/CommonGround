@@ -1,0 +1,141 @@
+You are helping build **CommonGround**, a civic community intelligence platform. Before writing any code, internalize this full project context.
+
+---
+
+## What CommonGround Is
+
+CommonGround is a map-based, open-source community intelligence tool that layers public data sources to surface actionable insights for mutual aid networks, tenant advocates, neighborhood associations, food access organizers, environmental justice advocates, and community organizers. It is built *for* communities, not institutions.
+
+**It is not a surveillance tool.** It is a community nervous system — the capacity to sense what is happening, share awareness laterally, and coordinate response.
+
+---
+
+## Core Non-Negotiables
+
+1. **No individual tracking.** All data surfaces at aggregate level (census tract or zip code minimum). The architecture enforces this technically — raw individual-level records never touch the application database.
+2. **No data sales or sharing with law enforcement, immigration enforcement, or any extractive actor.**
+3. **No dark patterns, engagement optimization, or advertising. Ever.**
+4. **All correlations are labeled as correlations.** Causal claims require primary source evidence. Uncertainty is always named. Every alert carries an explicit claim type: `CORRELATION`, `MECHANISM`, or `DOCUMENTED`.
+5. **AGPL-3.0 licensed.** All modifications must remain open source.
+6. **Designed for self-hosting and federation.** No proprietary dependencies.
+
+---
+
+## Tech Stack
+
+- **Backend:** Node.js + Express + PostGIS (PostgreSQL with spatial extension)
+- **Frontend:** MapLibre GL JS (bundled locally — no CDN dependency)
+- **Data pipelines:** Node.js ingestion scripts
+- **Deployment:** Docker Compose, self-hostable
+- **Repo:** Public GitHub, AGPL-3.0
+
+**Design language:** Solarpunk brutalism — warm earth tones (`#1A1208` soil, `#2D1F0E` bark, `#5A7A32` leaf, `#7FA843` sprout, `#D4A017` amber), Courier New for labels/UI chrome, Georgia for body text. Dark theme.
+
+---
+
+## Project Structure (Monorepo)
+
+```
+/api          — Express backend
+/frontend     — MapLibre app
+/ingest       — Data pipeline scripts
+/docs         — Compact, decision log, data registry
+/docker       — Docker Compose files
+```
+
+---
+
+## Data Sources (Phase 1 — Active)
+
+| Source | What it provides | Trust |
+|---|---|---|
+| USDA Food Access Research Atlas | Food desert tract designations | 4/5 |
+| EPA EJScreen | Pollution burden + demographic vulnerability by block group | 5/5 |
+| CDC Social Vulnerability Index | 16-factor composite vulnerability by tract | 5/5 |
+| HRSA FQHCs | Federally qualified health center locations | 4/5 |
+| NWS API (api.weather.gov) | Real-time weather + severe alerts, no key required | 5/5 |
+| MutualAidHub | Directory of mutual aid groups | 2/5 |
+| 211 Wisconsin | Food pantries, social services directory | 3/5 |
+| SNAP Retailer Locator | Authorized SNAP retailers | 4/5 |
+| EPA AirNow | Hourly AQI by pollutant | 5/5 |
+| HUD CHAS | Housing cost burden by tract | 4/5 |
+| Eviction Lab | County eviction filing rates | 4/5 |
+| OpenStreetMap (Overpass API) | Community infrastructure points | 3/5 |
+| OpenStates | Wisconsin legislative data | 4/5 |
+| Green Bay building permits | Permit activity by address → aggregate to block group | 4/5 |
+| Brown County Assessor | Property tax delinquency → aggregate to block group | 4/5 |
+| FreeFridges / Little Free Pantry | Community fridge locations + status | 2/5 |
+| Green Bay municipal permits/agendas | Assembly permits, rezoning, civic proceedings | 4/5 |
+
+**Phase 2 additions:** Wisconsin CCAP (eviction court records — requires legal review), DeFlock (ALPR surveillance infrastructure), HMDA, FEMA flood hazard, CDC PLACES, property ownership/LLC networks.
+
+---
+
+## Alert System
+
+Alerts have three tiers and three claim types:
+
+**Claim types:**
+- `DOCUMENTED` — primary source evidence of a specific actor/event; direct language permitted
+- `MECHANISM` — correlation + plausible causal pathway supported by external research
+- `CORRELATION` — co-occurrence pattern; use "associated with," never "causes"
+
+**Tier 1 (Immediate Action):** T1-H01 Mass Eviction Filing, T1-E01 Severe Weather + High SVI, T1-F01 Community Fridge Critical Need
+
+**Tier 2 (Emerging Pattern):** T2-H01 Compounding Displacement Pressure, T2-F01 Food Access Gap, T2-C01 Civic Action Window, T2-ENV01 Environmental Burden + Vulnerability
+
+**Tier 3 (Situational Awareness):** T3-S01 Assembly Safety Briefing, T3-I01 Surveillance Infrastructure Density, T3-R01 Mutual Aid Gap
+
+Every alert popup must display: claim type, data sources, last updated, and epistemic caution.
+
+---
+
+## Database Schema (Required)
+
+```sql
+layers     — layer metadata, trust rating, claim type, update frequency
+features   — geom, layer_id, properties JSONB, aggregation_level, last_updated
+alerts     — id, alert_type, claim_type, severity, trigger_conditions JSONB,
+             affected_geom, recommendation, caution, created_at, sources TEXT[]
+```
+
+**Minimum geometry is census tract.** No parcel-level or address-level storage.
+
+---
+
+## API Endpoints
+
+```
+GET  /layers                          — list layers with metadata
+GET  /features?layer=X&bbox=W,S,E,N  — GeoJSON features in bbox
+GET  /alerts?bbox=W,S,E,N&severity=X — active alerts for area
+GET  /weather?lat=X&lon=Y             — NWS conditions + alerts
+POST /resources                       — submit community resource
+```
+
+---
+
+## Phase Status
+
+- **Phase 1 (Months 1–3):** Foundation — working map with static layers, data pipelines, public repo. **Currently active.**
+- **Phase 2 (Months 4–6):** Intelligence layer — cross-layer signal engine, Tier 1/2 alerts, CCAP legal review, Stewardship Council formation, ActivityPub prototype.
+- **Phase 3 (Months 7–12):** Federation — Docker self-hosting, ActivityPub federation between instances, Stewardship Council governance operational.
+
+---
+
+## What NOT to Build (Phase 1)
+
+- No user accounts or authentication
+- No individual-level data display of any kind
+- No external analytics or tracking scripts
+- No proprietary map tile providers
+
+---
+
+## Pilot Geography
+
+Green Bay, Wisconsin / Brown County. Verify all Phase 1 data sources have coverage for Brown County.
+
+---
+
+You now have full project context. When I give you a task, apply this context without requiring re-explanation. Ask clarifying questions only if a decision would meaningfully affect the architecture — otherwise default to the most privacy-protective, community-aligned interpretation.

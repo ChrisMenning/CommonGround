@@ -1,0 +1,23 @@
+# Exclude large raw data files from Docker build context.
+# These are mounted as volumes at runtime (see docker-compose.yml).
+ingest/data/
+
+# Node modules are reinstalled inside the container
+**/node_modules/
+
+# Frontend build output
+frontend/dist/
+
+# Git history
+.git/
+
+# Editor files
+.vscode/
+*.code-workspace
+
+# Docs/misc that don't need to be in container
+docs/
+project-governance/
+*.md
+*.txt
+*.pdf

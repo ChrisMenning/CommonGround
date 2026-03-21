@@ -1,0 +1,15 @@
+FROM node:20-alpine
+WORKDIR /app
+
+# Install production dependencies
+COPY ingest/package.json ./
+RUN npm install --omit=dev --no-audit --no-fund
+
+# Copy ingest source
+COPY ingest/ ./
+
+# Non-root user for security
+RUN addgroup -S cg && adduser -S cg -G cg
+USER cg
+
+CMD ["node", "scheduler.js"]

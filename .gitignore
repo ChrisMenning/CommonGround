@@ -1,0 +1,50 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Build outputs
+frontend/dist/
+frontend/dist/vendor/
+
+# Data files (large downloads)
+ingest/data/raw/
+ingest/data/processed/
+*.csv
+*.geojson
+!ingest/seeds/fixtures/*.geojson
+
+# Database
+*.dump
+*.sql.gz
+pgdata/
+
+# Docker
+docker/pgdata/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Temp
+tmp/
+.tmp/

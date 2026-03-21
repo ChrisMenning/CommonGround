@@ -1,0 +1,27 @@
+# Development overrides — maps source directories for hot reload
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ../api:/app
+      - /app/node_modules
+    command: npm run dev
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+      target: builder
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+      - /app/dist
+    command: npm run dev
+    ports:
+      - "127.0.0.1:3001:3001"

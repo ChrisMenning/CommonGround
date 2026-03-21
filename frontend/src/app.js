@@ -1,0 +1,141 @@
+/**
+ * app.js — CommonGround frontend entry point.
+ *
+ * Initializes the MapLibre map, wires up layer controls and alert polling.
+ * maplibregl is a global loaded from dist/vendor/maplibre-gl.js (no CDN).
+ */
+'use strict';
+import { config } from './config.js';
+import { initLayers, refreshActiveLayers } from './layers.js';
+import { initAlerts, refreshAlerts } from './alerts.js';
+import { initWeather, refreshWeather } from './weather.js';
+import { apiFetch } from './api-client.js';
+
+/* global maplibregl */
+
+// ── Map initialization ────────────────────────────────────────────────────────
+
+const map = new maplibregl.Map({
+  container: 'map',
+  style: config.tileStyle,
+  center: config.mapCenter,
+  zoom: config.mapZoom,
+  // Accessibility
+  localIdeographFontFamily: "'Courier New', monospace",
+});
+
+map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
+map.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }), 'bottom-left');
+map.addControl(new maplibregl.FullscreenControl(), 'bottom-right');
+
+// ── Load sequence ─────────────────────────────────────────────────────────────
+
+map.on('load', async () => {
+  setStatus('Loading layers...');
+
+  await initLayers(map);
+  await initAlerts(map);
+  await initWeather(map);
+
+  // Dismiss loading screen
+  const loading = document.getElementById('loading');
+  if (loading) loading.classList.add('hidden');
+
+  setStatus('READY');
+
+  // Poll for fresh alerts on interval
+  setInterval(async () => {
+    await refreshAlerts();
+  }, config.alertPollInterval);
+
+  // Reload visible layer data and weather when map moves significantly
+  let moveTimer = null;
+  map.on('moveend', () => {
+    clearTimeout(moveTimer);
+    moveTimer = setTimeout(async () => {
+      await refreshAlerts();
+      await refreshActiveLayers();
+      await refreshWeather();
+    }, 500);
+  });
+});
+
+map.on('error', (e) => {
+  console.error('[map] Error:', e.error?.message || e);
+  setStatus('MAP ERROR — check tile source');
+});
+
+// ── Coordinates display ───────────────────────────────────────────────────────
+
+const coordsEl = document.getElementById('coords');
+map.on('mousemove', (e) => {
+  if (!coordsEl) return;
+  const lat = e.lngLat.lat.toFixed(5);
+  const lon = Math.abs(e.lngLat.lng).toFixed(5);
+  const hem = e.lngLat.lng < 0 ? 'W' : 'E';
+  coordsEl.textContent = `${lat}° N  ${lon}° ${hem}`;
+});
+
+map.on('mouseleave', () => {
+  if (coordsEl) coordsEl.textContent = '–';
+});
+
+// ── Resource submission form ──────────────────────────────────────────────────
+
+const resourceToggle = document.getElementById('resource-form-toggle');
+const resourceForm   = document.getElementById('resource-form');
+const resourceMsg    = document.getElementById('resource-form-msg');
+
+if (resourceToggle && resourceForm) {
+  resourceToggle.addEventListener('click', () => {
+    const hidden = resourceForm.classList.toggle('hidden');
+    resourceToggle.textContent = hidden ? '+ Submit Resource' : '− Submit Resource';
+    if (resourceMsg) resourceMsg.textContent = '';
+  });
+
+  resourceForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (resourceMsg) { resourceMsg.textContent = ''; resourceMsg.className = 'form-msg'; }
+
+    const fd = new FormData(resourceForm);
+    const body = {
+      name:        (fd.get('name') || '').trim(),
+      type:        fd.get('type'),
+      address:     (fd.get('address') || '').trim(),
+      description: (fd.get('description') || '').trim() || undefined,
+      contact:     (fd.get('contact') || '').trim() || undefined,
+    };
+
+    if (!body.name || !body.address) {
+      if (resourceMsg) { resourceMsg.textContent = 'Name and address are required.'; resourceMsg.className = 'form-msg form-msg-error'; }
+      return;
+    }
+
+    try {
+      await apiFetch('/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      resourceForm.reset();
+      resourceForm.classList.add('hidden');
+      resourceToggle.textContent = '+ Submit Resource';
+      if (resourceMsg) {
+        resourceMsg.textContent = 'Submitted — thank you. It will be reviewed before going live.';
+        resourceMsg.className = 'form-msg form-msg-success';
+      }
+    } catch (err) {
+      if (resourceMsg) {
+        resourceMsg.textContent = `Submission failed: ${err.message}`;
+        resourceMsg.className = 'form-msg form-msg-error';
+      }
+    }
+  });
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function setStatus(msg) {
+  const el = document.getElementById('status-msg');
+  if (el) el.textContent = msg;
+}
