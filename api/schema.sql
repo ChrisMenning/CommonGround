@@ -18,10 +18,11 @@ CREATE TABLE IF NOT EXISTS layers (
     trust_rating     INTEGER CHECK (trust_rating BETWEEN 1 AND 5),
     claim_type       TEXT CHECK (claim_type IN ('CORRELATION', 'MECHANISM', 'DOCUMENTED')),
     update_frequency TEXT,
-    aggregation_level TEXT CHECK (aggregation_level IN ('tract', 'block_group', 'zip', 'county', 'point')),
+    aggregation_level TEXT CHECK (aggregation_level IN ('tract', 'block_group', 'zip', 'county', 'point', 'neighborhood')),
     geometry_type    TEXT DEFAULT 'polygon',
     color            TEXT DEFAULT '#7FA843',
     active           BOOLEAN DEFAULT true,
+    data_vintage     TEXT,
     last_updated     TIMESTAMPTZ,
     created_at       TIMESTAMPTZ DEFAULT NOW()
 );
@@ -36,7 +37,7 @@ CREATE TABLE IF NOT EXISTS features (
     layer_id          INTEGER NOT NULL REFERENCES layers(id) ON DELETE CASCADE,
     geom              GEOMETRY(GEOMETRY, 4326) NOT NULL,
     properties        JSONB DEFAULT '{}',
-    aggregation_level TEXT CHECK (aggregation_level IN ('tract', 'block_group', 'zip', 'county', 'point')),
+    aggregation_level TEXT CHECK (aggregation_level IN ('tract', 'block_group', 'zip', 'county', 'point', 'neighborhood')),
     last_updated      TIMESTAMPTZ DEFAULT NOW(),
     created_at        TIMESTAMPTZ DEFAULT NOW()
 );
@@ -88,14 +89,15 @@ CREATE TABLE IF NOT EXISTS resources (
 -- ============================================================
 -- Phase 1 layer seeds
 -- ============================================================
-INSERT INTO layers (slug, name, description, source, source_url, trust_rating, claim_type, update_frequency, aggregation_level, geometry_type, color) VALUES
-  ('food-access',   'Food Desert Designations',      'USDA low-income, low-access census tracts (LILAs)',            'USDA Food Access Research Atlas', 'https://www.ers.usda.gov/data-products/food-access-research-atlas/', 4, 'DOCUMENTED', 'annual',    'tract',       'polygon', '#D4A017'),
-  ('ejscreen',      'Environmental Burden (EJScreen)', 'EPA pollution burden + demographic vulnerability by block group', 'EPA EJScreen',                   'https://www.epa.gov/ejscreen',                                       5, 'CORRELATION','annual',    'block_group', 'polygon', '#7FA843'),
-  ('svi',           'Social Vulnerability Index',    'CDC 16-factor composite vulnerability score by census tract',  'CDC SVI',                         'https://www.atsdr.cdc.gov/placeandhealth/svi/',                       5, 'CORRELATION','biennial',  'tract',       'polygon', '#5A7A32'),
-  ('fqhc',          'Federally Qualified Health Centers', 'HRSA-funded community health center locations',            'HRSA Data Warehouse',             'https://data.hrsa.gov/topics/health-centers/fqhc',                   4, 'DOCUMENTED', 'quarterly', 'point',       'point',   '#7FA843'),
-  ('snap-retailers','SNAP Authorized Retailers',     'USDA SNAP-authorized food retailers',                         'USDA SNAP Retailer Locator',      'https://www.fns.usda.gov/snap/retailer-locator',                     4, 'DOCUMENTED', 'monthly',   'point',       'point',   '#D4A017'),
-  ('airnow',        'Air Quality Index',             'EPA AirNow hourly AQI readings by monitor location',           'EPA AirNow',                       'https://www.airnowapi.org/',                                          5, 'DOCUMENTED', 'hourly',    'point',       'point',   '#5A7A32'),
-  ('hud-chas',      'Housing Cost Burden',           'HUD CHAS households paying >30% or >50% of income on housing', 'HUD CHAS',                        'https://www.huduser.gov/portal/datasets/cp.html',                    4, 'DOCUMENTED', 'annual',    'tract',       'polygon', '#D4A017'),
-  ('eviction-lab',  'Eviction Filing Rate',          'Eviction Lab county-level eviction filing rates',              'Eviction Lab (Princeton)',         'https://evictionlab.org/eviction-tracking/',                         4, 'DOCUMENTED', 'monthly',   'county',      'polygon', '#D4A017'),
-  ('osm-resources', 'Community Infrastructure',      'OpenStreetMap community facilities (parks, libraries, clinics)', 'OpenStreetMap / Overpass API',  'https://overpass-api.de/',                                           3, 'DOCUMENTED', 'weekly',    'point',       'point',   '#7FA843')
+INSERT INTO layers (slug, name, description, source, source_url, trust_rating, claim_type, update_frequency, aggregation_level, geometry_type, color, data_vintage) VALUES
+  ('food-access',   'Food Desert Designations',      'USDA low-income, low-access census tracts (LILAs)',            'USDA Food Access Research Atlas', 'https://www.ers.usda.gov/data-products/food-access-research-atlas/', 4, 'DOCUMENTED', 'annual',    'tract',       'polygon', '#D4A017', '2019'),
+  ('ejscreen',      'Environmental Burden (EJScreen)', 'EPA pollution burden + demographic vulnerability by block group', 'EPA EJScreen',                   'https://www.epa.gov/ejscreen',                                       5, 'CORRELATION','annual',    'block_group', 'polygon', '#7FA843', '2024'),
+  ('svi',           'Social Vulnerability Index',    'CDC 16-factor composite vulnerability score by census tract',  'CDC SVI',                         'https://www.atsdr.cdc.gov/placeandhealth/svi/',                       5, 'CORRELATION','biennial',  'tract',       'polygon', '#5A7A32', '2022'),
+  ('fqhc',          'Federally Qualified Health Centers', 'HRSA-funded community health center locations',            'HRSA Data Warehouse',             'https://data.hrsa.gov/topics/health-centers/fqhc',                   4, 'DOCUMENTED', 'quarterly', 'point',       'point',   '#7FA843', 'Current'),
+  ('snap-retailers','SNAP Authorized Retailers',     'USDA SNAP-authorized food retailers',                         'USDA SNAP Retailer Locator',      'https://www.fns.usda.gov/snap/retailer-locator',                     4, 'DOCUMENTED', 'monthly',   'point',       'point',   '#D4A017', 'Current'),
+  ('airnow',        'Air Quality Index',             'EPA AirNow hourly AQI readings by monitor location',           'EPA AirNow',                       'https://www.airnowapi.org/',                                          5, 'DOCUMENTED', 'hourly',    'point',       'point',   '#5A7A32', 'Real-time'),
+  ('hud-chas',      'Housing Cost Burden',           'HUD CHAS households paying >30% or >50% of income on housing', 'HUD CHAS',                        'https://www.huduser.gov/portal/datasets/cp.html',                    4, 'DOCUMENTED', 'annual',    'tract',       'polygon', '#D4A017', '2018–2022'),
+  ('eviction-lab',  'Eviction Filing Rate',          'Eviction Lab county-level eviction filing rates',              'Eviction Lab (Princeton)',         'https://evictionlab.org/eviction-tracking/',                         4, 'DOCUMENTED', 'monthly',   'county',      'polygon', '#D4A017', '2016'),
+  ('osm-resources', 'Community Infrastructure',      'OpenStreetMap community facilities (parks, libraries, clinics)', 'OpenStreetMap / Overpass API',  'https://overpass-api.de/',                                           3, 'DOCUMENTED', 'weekly',    'point',       'point',   '#7FA843', 'Current'),
+  ('neighborhood-assoc', 'Neighborhood Associations', 'City of Green Bay neighborhood association boundaries. Active associations shown in teal; inactive (currently reorganizing) in gray.', 'City of Green Bay GIS', 'https://map.greenbaywi.gov/server/rest/services/CED/NeighborhoodAssociations/MapServer/0', 4, 'DOCUMENTED', 'quarterly', 'neighborhood', 'polygon', '#2196A5', '2024')
 ON CONFLICT (slug) DO NOTHING;

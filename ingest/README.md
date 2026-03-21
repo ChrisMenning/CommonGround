@@ -22,7 +22,7 @@ Several federal data sources have been removed or made inaccessible following cu
 | HUD CHAS | huduser.gov/portal/datasets/cp.html | ✅ Still available (updated Dec 2025) | — |
 | Eviction Lab | evictionlab.org | ✅ Still available (Princeton University) | — |
 | USDA SNAP Retailers | fns.usda.gov/snap/retailer/data | ✅ Still available | ArcGIS API first |
-| HRSA FQHCs | data.hrsa.gov | ⚠️ Partial (DNS issues in Docker) | Manual CSV fallback |
+| HRSA FQHCs | data.hrsa.gov | ⚠️ Partial (DNS issues in Docker; auto-downloads CSV instead) | Auto-downloads `Health_Center_Service_Delivery_and_LookAlike_Sites.csv` |
 | EPA AirNow | airnowapi.org | ✅ API still working | — |
 
 **Archive resources:**
@@ -53,7 +53,7 @@ node run-all.js --skip-manual
 
 The script tries the HRSA API automatically. If it fails (DNS or endpoint issues inside Docker), download manually:
 
-1. Download CSV: https://data.hrsa.gov/api/download?filename=HCPSITE.csv&fileType=csv
+1. Download CSV: https://data.hrsa.gov/DataDownload/DD_Files/Health_Center_Service_Delivery_and_LookAlike_Sites.csv
 2. Save to: `data/raw/fqhc-sites.csv`
 3. Run: `node seeds/fqhc.js` (or re-run `node run-all.js --skip-manual`)
 
@@ -135,9 +135,42 @@ Download requires a (free) email registration.
 5. County boundaries auto-download — no extra step needed.
 6. Run: `node seeds/eviction-lab.js`
 
-### 4. SNAP Authorized Retailers ✅ API auto-fetches first
+### 4. Green Bay Neighborhood Associations ✅ AUTO-FETCHES
 
-**Script:** `seeds/snap-retailers.js`
+**Script:** `seeds/neighborhood-associations.js`
+
+Fetches neighborhood association boundaries from the City of Green Bay GIS server.
+52 associations total (34 active, 18 currently inactive/reorganizing). Active
+associations display in teal; inactive in gray.
+
+```bash
+docker compose run --rm ingest node seeds/neighborhood-associations.js
+```
+
+**Extending to other cities/counties:**
+
+Every municipality structures this differently. The script has a top-level
+`CONFIG` block — edit these fields to adapt it to another jurisdiction:
+
+| Config key | Description |
+|---|---|
+| `jurisdiction` | Display name for log messages |
+| `api_url` | ArcGIS (or other) query URL for the polygon layer |
+| `field_map` | Maps source field names → our property names |
+| `active_status_value` | The string in the "status" field that means active |
+
+In a future phase, this configuration will move to a user-editable UI so
+each county can manage their own sources without editing code.
+
+**Green Bay data:**
+- Service: `https://map.greenbaywi.gov/server/rest/services/CED/NeighborhoodAssociations/MapServer/0`
+- ArcGIS item: https://www.arcgis.com/home/item.html?id=be811ada3f9e41d8af200e11f8553413
+- Maintained by: City of Green Bay Community & Economic Development Division
+- Neighborhoods website: https://gbneighborhoods.org/
+
+---
+
+### 5. SNAP Authorized Retailers ✅ API auto-fetches first**Script:** `seeds/snap-retailers.js`
 
 The script tries the USDA FNS ArcGIS REST API automatically. If the API returns an error, it falls back to a local CSV.
 
@@ -156,9 +189,10 @@ The script tries the USDA FNS ArcGIS REST API automatically. If the API returns 
 | CDC SVI 2022 | `seeds/svi.js` | **Auto-downloads** from PEDP GitHub archive (CDC site removed 2025) |
 | EPA EJScreen 2024 | `seeds/ejscreen.js` | **Auto-downloads** from Harvard Dataverse (EPA site removed 2025) |
 | HRSA FQHCs | `seeds/fqhc.js` | Tries HRSA REST API; falls back to local CSV if DNS fails |
-| OpenStreetMap | `seeds/osm-resources.js` | Overpass API |
-| EPA AirNow | `seeds/airnow.js` | Requires `AIRNOW_API_KEY` in `api/.env` |
+| OSM Community Resources | `seeds/osm-resources.js` | Overpass API |
+| AirNow AQI | `seeds/airnow.js` | Requires `AIRNOW_API_KEY` in `api/.env` |
 | USDA SNAP Retailers | `seeds/snap-retailers.js` | Tries ArcGIS API; falls back to local CSV |
+| Green Bay Neighborhood Associations | `seeds/neighborhood-associations.js` | City of Green Bay GIS (ArcGIS MapServer); auto-runs migration to extend aggregation_level enum |
 
 ---
 
@@ -182,5 +216,6 @@ For production, run ingest scripts on a schedule:
 | `osm-resources.js` | Weekly |
 | `fqhc.js` | Quarterly |
 | `snap-retailers.js` | Monthly |
+| `neighborhood-associations.js` | Quarterly |
 | `eviction-lab.js` | Monthly |
 | `food-access.js`, `ejscreen.js`, `svi.js`, `hud-chas.js` | Annually |

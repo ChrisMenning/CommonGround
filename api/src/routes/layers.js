@@ -13,7 +13,7 @@ router.get('/', async (_req, res, next) => {
         trust_rating, claim_type,
         update_frequency, aggregation_level,
         geometry_type, color,
-        last_updated, created_at
+        data_vintage, last_updated, created_at
       FROM layers
       WHERE active = true
       ORDER BY name ASC
@@ -37,7 +37,7 @@ router.get('/:slug', async (req, res, next) => {
               trust_rating, claim_type,
               update_frequency, aggregation_level,
               geometry_type, color,
-              last_updated, created_at
+              data_vintage, last_updated, created_at
        FROM layers WHERE slug = $1 AND active = true`,
       [req.params.slug]
     );

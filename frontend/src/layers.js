@@ -15,7 +15,7 @@ const LAYER_GROUPS = {
   'Food Access':    ['food-access', 'snap-retailers'],
   'Housing':        ['hud-chas', 'eviction-lab'],
   'Health':         ['fqhc', 'svi'],
-  'Community':      ['osm-resources'],
+  'Community':      ['osm-resources', 'neighborhood-assoc'],
 };
 
 // Track which layers are currently enabled
@@ -88,9 +88,20 @@ function buildLayerItem(layer) {
   dot.className = 'layer-dot';
   dot.style.background = layer.color || '#7FA843';
 
+  const nameWrapper = document.createElement('span');
+  nameWrapper.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:1px;min-width:0';
+
   const nameEl = document.createElement('span');
-  nameEl.style.flex = '1';
   nameEl.textContent = layer.name;
+
+  nameWrapper.appendChild(nameEl);
+
+  if (layer.data_vintage) {
+    const vintageEl = document.createElement('span');
+    vintageEl.textContent = `Data: ${layer.data_vintage}`;
+    vintageEl.style.cssText = 'font-size:10px;color:#888;line-height:1.2';
+    nameWrapper.appendChild(vintageEl);
+  }
 
   const trust = document.createElement('span');
   trust.className = 'trust-pip';
@@ -99,7 +110,7 @@ function buildLayerItem(layer) {
   const toggle = document.createElement('div');
   toggle.className = 'layer-toggle';
 
-  item.append(dot, nameEl, trust, toggle);
+  item.append(dot, nameWrapper, trust, toggle);
 
   item.addEventListener('click', () => {
     const isActive = layerState[layer.slug];
@@ -167,7 +178,8 @@ function disableLayer(layer) {
   const layerId  = `cg-${layer.slug}-fill`;
   const outlineId = `cg-${layer.slug}-outline`;
   const circleId = `cg-${layer.slug}-circle`;
-  [layerId, outlineId, circleId].forEach(id => {
+  const labelId  = `cg-${layer.slug}-label`;
+  [layerId, outlineId, circleId, labelId].forEach(id => {
     if (_map.getLayer(id)) _map.removeLayer(id);
   });
   if (_map.getSource(sourceId)) _map.removeSource(sourceId);
@@ -224,7 +236,48 @@ async function addMapLayer(layer) {
 
     const choropleth = CHOROPLETH[layer.slug];
     let fillColor;
-    if (choropleth) {
+    if (layer.slug === 'neighborhood-assoc') {
+      // Data-driven style: active associations in teal, inactive in gray.
+      // This differentiates reorganizing/inactive neighborhoods without hiding them.
+      _map.addLayer({
+        id: `${sourceId}-fill`,
+        type: 'fill',
+        source: sourceId,
+        paint: {
+          'fill-color':   ['match', ['get', 'status'], 'ACTIVE', '#2196A5', '#aaaaaa'],
+          'fill-opacity': ['match', ['get', 'status'], 'ACTIVE', 0.18, 0.07],
+        },
+      });
+      _map.addLayer({
+        id: `${sourceId}-outline`,
+        type: 'line',
+        source: sourceId,
+        paint: {
+          'line-color':   ['match', ['get', 'status'], 'ACTIVE', '#2196A5', '#999999'],
+          'line-opacity': ['match', ['get', 'status'], 'ACTIVE', 0.85, 0.35],
+          'line-width': 1.5,
+        },
+      });
+      _map.addLayer({
+        id: `${sourceId}-label`,
+        type: 'symbol',
+        source: sourceId,
+        layout: {
+          'text-field':         ['get', 'name'],
+          'text-font':          ['Noto Sans Regular'],
+          'text-size':          11,
+          'text-anchor':        'center',
+          'text-max-width':     8,
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color':      ['match', ['get', 'status'], 'ACTIVE', '#0d5c6e', '#666666'],
+          'text-halo-color': 'rgba(255,255,255,0.85)',
+          'text-halo-width': 1.5,
+          'text-opacity':    ['match', ['get', 'status'], 'ACTIVE', 1, 0.55],
+        },
+      });
+    } else if (choropleth) {
       // Build an interpolate expression: null/missing values fall back to grey
       fillColor = [
         'case',
@@ -239,25 +292,27 @@ async function addMapLayer(layer) {
       fillColor = layer.color || '#7FA843';
     }
 
-    _map.addLayer({
-      id: `${sourceId}-fill`,
-      type: 'fill',
-      source: sourceId,
-      paint: {
-        'fill-color': fillColor,
-        'fill-opacity': choropleth ? 0.75 : 0.18,
-      },
-    });
-    _map.addLayer({
-      id: `${sourceId}-outline`,
-      type: 'line',
-      source: sourceId,
-      paint: {
-        'line-color': choropleth ? '#555555' : (layer.color || '#7FA843'),
-        'line-opacity': choropleth ? 0.35 : 0.6,
-        'line-width': 1,
-      },
-    });
+    if (layer.slug !== 'neighborhood-assoc') {
+      _map.addLayer({
+        id: `${sourceId}-fill`,
+        type: 'fill',
+        source: sourceId,
+        paint: {
+          'fill-color': fillColor,
+          'fill-opacity': choropleth ? 0.75 : 0.18,
+        },
+      });
+      _map.addLayer({
+        id: `${sourceId}-outline`,
+        type: 'line',
+        source: sourceId,
+        paint: {
+          'line-color': choropleth ? '#555555' : (layer.color || '#7FA843'),
+          'line-opacity': choropleth ? 0.35 : 0.6,
+          'line-width': 1,
+        },
+      });
+    }
   }
 
   // Click popup for features
@@ -296,7 +351,28 @@ function showFeaturePopup(lngLat, layer, props) {
 
   const choroplethMeta = CHOROPLETH_LABEL[layer.slug];
   let keyMetricHtml = '';
-  if (choroplethMeta) {
+
+  // Neighborhood associations get a custom header showing status + meeting info
+  if (layer.slug === 'neighborhood-assoc') {
+    const isActive = props.status === 'ACTIVE';
+    const badgeColor  = isActive ? '#2196A5' : '#888';
+    const badgeLabel  = isActive ? 'Active' : 'Inactive';
+    const meetingInfo = [props.meet_schedule, props.meet_place].filter(Boolean).join(' — ') || null;
+    const emailHtml   = props.email
+      ? `<a href="mailto:${escHtml(props.email)}" style="color:#2196A5">${escHtml(props.email)}</a>`
+      : null;
+    keyMetricHtml = `
+      <div style="display:flex;align-items:center;gap:8px;background:#f5f5f5;border-radius:4px;padding:6px 8px;margin-bottom:8px">
+        <div style="width:16px;height:16px;border-radius:50%;background:${badgeColor};flex-shrink:0"></div>
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em">Status</div>
+          <div style="font-weight:600;font-size:13px">${escHtml(badgeLabel)}</div>
+        </div>
+      </div>
+      ${props.president ? `<div style="font-size:11px;margin-bottom:4px"><b>President:</b> ${escHtml(props.president)}</div>` : ''}
+      ${meetingInfo    ? `<div style="font-size:11px;margin-bottom:4px"><b>Meetings:</b> ${escHtml(meetingInfo)}</div>` : ''}
+      ${emailHtml      ? `<div style="font-size:11px;margin-bottom:6px"><b>Contact:</b> ${emailHtml}</div>` : ''}`;
+  } else if (choroplethMeta) {
     const raw = props[choroplethMeta.property];
     if (raw != null && raw >= 0) {
       const color = choroplethMeta.colorFn(raw);
@@ -312,7 +388,11 @@ function showFeaturePopup(lngLat, layer, props) {
   }
 
   // Exclude the key metric from the general properties list to avoid duplication
-  const skipProps = choroplethMeta ? new Set([choroplethMeta.property]) : new Set();
+  const skipProps = choroplethMeta
+    ? new Set([choroplethMeta.property])
+    : layer.slug === 'neighborhood-assoc'
+      ? new Set(['president', 'email', 'meet_place', 'meet_schedule', 'status', 'is_active', 'jurisdiction', 'source', 'data_year'])
+      : new Set();
   const propsHtml = Object.entries(displayProps)
     .filter(([k]) => !skipProps.has(k))
     .slice(0, 12)
