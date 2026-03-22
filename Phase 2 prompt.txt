@@ -1,4 +1,4 @@
-You are helping build **CommonGround**, a civic community intelligence platform. Phase 1 is complete. You are beginning Phase 2. Before writing any code, internalize this full project context — it supersedes Phase 1 prompt.txt where the two conflict.
+You are helping build **CommonGround**, a civic community intelligence platform. Phases 1 and 1.5 are complete. You are beginning Phase 2. Before writing any code, internalize this full project context — it supersedes Phase 1 prompt.txt and Phase 1.5 prompt.txt where they conflict.
 
 ---
 
@@ -49,9 +49,9 @@ CommonGround is a map-based, open-source community intelligence tool that layers
 
 ---
 
-## Phase 1 — COMPLETE
+## Phase 1 + Phase 1.5 — COMPLETE
 
-All of the following are working and deployed:
+All of the following are working and deployed.
 
 ### Data Layers (10 active)
 
@@ -68,82 +68,98 @@ All of the following are working and deployed:
 | `osm-resources` | OpenStreetMap community infrastructure | 97 | point |
 | `neighborhood-assoc` | Neighborhood association boundaries + labels | 52 | neighborhood |
 
-### Database Schema (Current)
+### Database Schema (Current — after Phase 1.5)
 
 ```sql
 layers (
-  id SERIAL PRIMARY KEY,
-  slug TEXT UNIQUE NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT,
-  source_url TEXT,
-  trust_rating INTEGER CHECK (trust_rating BETWEEN 1 AND 5),
-  claim_type TEXT CHECK (claim_type IN ('DOCUMENTED','MECHANISM','CORRELATION')),
+  id               SERIAL PRIMARY KEY,
+  slug             TEXT UNIQUE NOT NULL,
+  name             TEXT NOT NULL,
+  description      TEXT,
+  source           TEXT NOT NULL,
+  source_url       TEXT,
+  trust_rating     INTEGER CHECK (trust_rating BETWEEN 1 AND 5),
+  claim_type       TEXT CHECK (claim_type IN ('DOCUMENTED','MECHANISM','CORRELATION')),
   update_frequency TEXT,
-  data_vintage TEXT,        -- added Phase 1
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  aggregation_level TEXT CHECK (aggregation_level IN ('tract','block_group','zip','county','point','neighborhood')),
+  geometry_type    TEXT DEFAULT 'polygon',
+  color            TEXT DEFAULT '#7FA843',
+  active           BOOLEAN DEFAULT true,
+  data_vintage     TEXT,
+  parent_slug      TEXT REFERENCES layers(slug),   -- added Phase 1.5
+  is_composite     BOOLEAN DEFAULT false,           -- added Phase 1.5
+  last_updated     TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ DEFAULT NOW()
 )
 
 features (
-  id SERIAL PRIMARY KEY,
-  layer_id INTEGER REFERENCES layers(id),
-  geom GEOMETRY(Geometry, 4326) NOT NULL,
-  properties JSONB NOT NULL DEFAULT '{}',
-  aggregation_level TEXT CHECK (aggregation_level IN
-    ('tract','block_group','zip','county','neighborhood','point')),
-  last_updated TIMESTAMPTZ DEFAULT NOW()
+  id                SERIAL PRIMARY KEY,
+  layer_id          INTEGER NOT NULL REFERENCES layers(id) ON DELETE CASCADE,
+  geom              GEOMETRY(GEOMETRY, 4326) NOT NULL,
+  properties        JSONB DEFAULT '{}',
+  aggregation_level TEXT CHECK (aggregation_level IN ('tract','block_group','zip','county','point','neighborhood')),
+  last_updated      TIMESTAMPTZ DEFAULT NOW(),
+  created_at        TIMESTAMPTZ DEFAULT NOW()
 )
 
 alerts (
-  id SERIAL PRIMARY KEY,
-  alert_type TEXT NOT NULL,
-  claim_type TEXT NOT NULL CHECK (claim_type IN ('DOCUMENTED','MECHANISM','CORRELATION')),
-  severity TEXT NOT NULL CHECK (severity IN ('T1','T2','T3')),
-  title TEXT NOT NULL,
-  description TEXT,
-  trigger_conditions JSONB,
-  affected_geom GEOMETRY(Geometry, 4326),
-  recommendation TEXT,
-  caution TEXT,
-  sources TEXT[],
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  expires_at TIMESTAMPTZ
+  id                 SERIAL PRIMARY KEY,
+  alert_type         TEXT NOT NULL,
+  claim_type         TEXT NOT NULL CHECK (claim_type IN ('DOCUMENTED','MECHANISM','CORRELATION')),
+  severity           INTEGER NOT NULL CHECK (severity BETWEEN 1 AND 3),  -- 1=T1, 2=T2, 3=T3
+  title              TEXT NOT NULL,
+  description        TEXT,
+  trigger_conditions JSONB DEFAULT '{}',
+  affected_geom      GEOMETRY(GEOMETRY, 4326),
+  recommendation     TEXT,
+  caution            TEXT NOT NULL,              -- required; no alert without epistemic caution
+  sources            TEXT[] NOT NULL DEFAULT '{}',
+  active             BOOLEAN DEFAULT true,
+  created_at         TIMESTAMPTZ DEFAULT NOW(),
+  expires_at         TIMESTAMPTZ
 )
 
 resources (
-  id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL,
-  category TEXT,
-  address TEXT,
-  lat DOUBLE PRECISION,
-  lon DOUBLE PRECISION,
-  phone TEXT,
-  hours TEXT,
-  notes TEXT,
-  approved BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  id           SERIAL PRIMARY KEY,
+  name         TEXT NOT NULL,
+  type         TEXT NOT NULL,     -- category of resource (food_pantry, shelter, etc.)
+  description  TEXT,
+  address      TEXT,
+  contact      TEXT,              -- no lat/lon stored; geocoded to block group on approval
+  submitted_at TIMESTAMPTZ DEFAULT NOW(),
+  approved     BOOLEAN DEFAULT false
 )
 ```
 
 **Minimum geometry is census tract.** No parcel-level or address-level storage.
 
-### API Endpoints (All working)
+**`severity` is an INTEGER (1/2/3), not a text label.** Signal modules must write `severity: 1` for T1, `severity: 2` for T2, `severity: 3` for T3. Using a string like `'T1'` will fail the CHECK constraint.
+
+### API Endpoints (All working — after Phase 1.5)
 
 ```
-GET  /layers                          — list layers with metadata + data_vintage
-GET  /features?layer=X&bbox=W,S,E,N  — GeoJSON features in bbox
-GET  /alerts?bbox=W,S,E,N&severity=X — active alerts for area
-GET  /weather?lat=X&lon=Y             — NWS conditions + alerts
-POST /resources                       — submit community resource
+GET  /layers                                      — list layers; excludes is_composite=true by default
+GET  /layers?include_composite=true               — includes composite parent layers
+GET  /features?layer=X&bbox=W,S,E,N              — GeoJSON features in bbox (sub-layer queries proxy to parent)
+GET  /features?layer=airnow                      — no bbox required for point layers (used by weather sidebar)
+GET  /features?point=lng,lat&layers=s1,s2,s3     — point-query: one feature per layer at that coordinate (info drawer)
+GET  /alerts?bbox=W,S,E,N&severity=X             — active alerts for area
+GET  /weather?lat=X&lon=Y                         — NWS conditions + alerts
+POST /resources                                   — submit community resource
 ```
 
-### Frontend (All working)
+### Frontend (All working — after Phase 1.5)
 
 - MapLibre map centered on Green Bay, WI
-- Layer toggle panel with data vintage display in sidebar
+- Layer toggle sidebar with 25 sub-layers grouped by Source or Data Type (toggle button)
+  - EJScreen split into 10 sub-layers, SVI into 5, HUD CHAS into 3, Eviction Lab into 7
+  - Composite parent layers hidden by default; "Show Composite Layers" toggle reveals them
+  - Each active choropleth layer shows an opacity slider
+- **Info drawer** (right-side panel, not popup) for polygon/area layer clicks — shows one collapsible card per active layer at the clicked point. Point layers (fqhc, snap-retailers, airnow, osm-resources) continue to use standard MapLibre popups.
 - NWS weather conditions + severe weather alerts
 - Alert sidebar polled every 5 minutes (alert map markers + sidebar list already implemented)
 - Community resource submission form
+- Phosphor fill icons used throughout (map sprites + sidebar icons + weather icons)
 
 ---
 
@@ -171,6 +187,8 @@ See `project-governance/commonground-planned-alerts-v01.txt` for the complete al
 - `CORRELATION` — co-occurrence pattern; use "associated with," never "causes"
 
 ### All 9 Alerts
+
+Note: signal engine must query composite parent layer slugs (`ejscreen`, `svi`, `eviction-lab`, `hud-chas`), not sub-layer slugs. Sub-layers have no own rows in `features` — they proxy to the parent. Do not delete composite parent rows from `layers`.
 
 | Alert ID | Name | Tier | Claim Type | Phase 1 data sufficient? | Blocker |
 |---|---|---|---|---|---|
@@ -319,12 +337,14 @@ CREATE TABLE IF NOT EXISTS signal_runs (
 
 ## Phase 2C — Alert Frontend Enhancements
 
-Phase 1 already has: alert sidebar, map point markers, 5-minute polling.
+Phase 1.5 already has: alert sidebar, map point markers, 5-minute polling, info drawer for polygon layers.
+
+**Coexistence with the info drawer:** Alert polygon overlays and the info drawer both respond to map clicks. Alert overlays must set a distinct GeoJSON source ID prefix (`alert-geom-<id>`) and the click handler must not intercept clicks that are already handled by the info drawer. The existing drawer is the canonical handler for data layer clicks; alert overlay clicks are a separate event path (check `alert-geom-*` layers first, drawer falls through if no alert hit).
 
 Phase 2 adds:
-- **Alert detail popup:** claim type badge, data sources cited, epistemic caution text, recommended action, trigger condition values ("Why is this firing?"), last evaluated timestamp
+- **Alert detail panel:** claim type badge, data sources cited, epistemic caution text, recommended action, trigger condition values ("Why is this firing?"), last evaluated timestamp — rendered in the existing drawer or a dedicated alert detail panel, consistent with Phase 1.5 UI patterns
 - **Polygon overlay:** `affected_geom` rendered as a GeoJSON fill layer, not just a point marker
-- **Tier/severity filtering:** dropdown or button group in alert sidebar to filter by T1/T2/T3
+- **Tier/severity filtering:** filter by severity INTEGER (1/2/3), displayed to user as T1/T2/T3
 - **Alert count badge** on the sidebar toggle button
 
 ---
@@ -339,9 +359,11 @@ Phase 2 adds a minimal admin UI:
 
 ```
 GET  /admin/resources              — list pending (approved=false) submissions
-POST /admin/resources/:id/approve  — set approved=true, geocode if lat/lon absent, add to features
+POST /admin/resources/:id/approve  — set approved=true, geocode address → add to features table at block-group level
 POST /admin/resources/:id/reject   — delete submission
 ```
+
+**`resources` table note:** The table has no `lat`/`lon` columns — coordinates are never stored at the resource level. On approval, the address is geocoded and the result is written as a new row in `features` (point geometry, block-group aggregation). The resource row itself is only a moderation queue entry.
 
 ### Auth (Phase 2)
 
@@ -541,13 +563,18 @@ the user to "consider the landlord's perspective."
 
 ---
 
-## Key Lessons from Phase 1 (Don't Repeat)
+## Key Lessons from Phase 1 + 1.5 (Don't Repeat)
 
 - **MapLibre font names:** OpenFreeMap Liberty only provides `Noto Sans Regular`, `Noto Sans Italic`, `Noto Sans Bold`. Any other font name in a symbol `text-font` array causes async glyph 404 errors that trigger MapLibre's internal error handler and silently wipe ALL dynamically-added layers (fill, outline, and label layers). Always look up available fonts from the Liberty style JSON before adding symbol layers.
 - **Docker compose:** Always use `docker compose -f docker/docker-compose.yml ...` from the project root. The dev overlay (`docker-compose.dev.yml`) breaks the nginx stage.
-- **Data vintage:** `layers.data_vintage TEXT` column exists (added Phase 1). Populate it in all new seed scripts.
+- **Data vintage:** `layers.data_vintage TEXT` column exists. Populate it in all new seed scripts.
 - **Ingest pattern:** Each seed script uses a `const CONFIG = { ... }` block at the top for all configurable values (URLs, layer name, slugs, etc.). Follow this pattern for all Phase 2 seeds.
+- **Sub-layer feature queries:** Sub-layers (`ejscreen-ej-score`, `svi-overall`, etc.) have `parent_slug` set and no own rows in `features`. The API resolves the parent automatically. Signal engine code must query parent slugs directly.
+- **Composite layers:** `is_composite = true` hides a layer from the sidebar but it remains fully queryable. Do not delete or deactivate composite parent rows — the signal engine depends on them.
+- **`severity` is INTEGER:** The `alerts.severity` column is `INTEGER 1/2/3`. Write `severity: 1` for T1, `severity: 2` for T2, `severity: 3` for T3. Tier labels (T1/T2/T3) are display-only.
+- **Phosphor SVG icons:** Phosphor fill SVGs use `fill="currentColor"` — replace it (don't prepend) with the target color. Phosphor SVGs have no `width`/`height` attributes — inject them explicitly or the image renders at 0×0. For MapLibre sprite registration, use `await img.decode()` before calling `map.addImage()` — passing an undecoded `<img>` produces blank sprites in WebGL.
+- **`resources` table has no lat/lon:** Coordinates are never stored on the resource row. Geocoding happens at approval time and writes a new `features` row.
 
 ---
 
-You now have full Phase 1 + Phase 2 context. Begin with Phase 2A data sources unless I direct otherwise. Ask clarifying questions only if a decision would meaningfully affect the architecture or data trust model — otherwise default to the most privacy-protective, community-aligned interpretation.
+You now have full Phase 1 + 1.5 + Phase 2 context. The fastest path to a working signal engine is to build the three signals that need no new data sources first: T1-E01, T2-F01, and T2-ENV01. These can be built entirely from Phase 1 data already in the database. Begin there unless directed otherwise. Ask clarifying questions only if a decision would meaningfully affect the architecture or data trust model — otherwise default to the most privacy-protective, community-aligned interpretation.
