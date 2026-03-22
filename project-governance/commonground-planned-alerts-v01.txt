@@ -14,6 +14,12 @@ v0.1  ·  March 2026
 
 - DOCUMENTED — Primary source evidence of a specific actor or event in this place at this time. Direct language permitted.
 
+---
+
+> **Data source trust notice:** Several federal sources cited in these alerts have had their trust ratings downgraded for current-conditions use. Trust ratings for EPA EJScreen, CDC SVI, HRSA FQHCs are 3/5 for current data (federal pages removed in 2025; data now archived via EDGI/PEDP). NWS and the Eviction Lab are unaffected. See `docs/DATA-REGISTRY.md` for full current-conditions ratings before making claims based on source authority.
+
+---
+
 # Tier 1: Immediate Action
 
 High-confidence signals requiring rapid community response. Reserved for documented events or strong mechanism-based patterns.

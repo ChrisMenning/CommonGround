@@ -1,3 +1,8 @@
+---
+> **HISTORICAL REFERENCE — Phase 1 context only.**
+> Trust ratings in the data source table below reflect pre-2025 baselines and have since been revised. See `docs/DATA-REGISTRY.md` for current-conditions trust ratings (EJScreen, SVI, FQHCs, Food Access, CHAS all downgraded to 3/5 for current use; AirNow to 4/5). The database schema shown here was extended in Phase 1.5 — see `Phase 2 prompt.txt` for the current schema. Phase 1 and 1.5 are both complete.
+---
+
 You are helping build **CommonGround**, a civic community intelligence platform. Before writing any code, internalize this full project context.
 
 ---

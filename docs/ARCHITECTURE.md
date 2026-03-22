@@ -1,7 +1,7 @@
 # CommonGround Architecture
 
-**Phase 1 — Foundation**
-*Last updated: 2026-03-20*
+**Phases 1 + 1.5 — Foundation**
+*Last updated: 2026-03-22*
 
 ---
 
@@ -29,10 +29,10 @@ Three tables:
 
 | Table | Purpose | Key constraint |
 |---|---|---|
-| `layers` | Metadata for each data layer | `slug` unique |
+| `layers` | Metadata for each data layer | `slug` unique; `parent_slug` + `is_composite` support Phase 1.5 sub-layers |
 | `features` | Spatial geometries + JSONB properties | Geometry index (GIST), minimum tract granularity |
-| `alerts` | Cross-layer signal outputs | Spatial index on `affected_geom` |
-| `resources` | Community-submitted locations | `approved = false` until moderated |
+| `alerts` | Cross-layer signal outputs | Spatial index on `affected_geom`; `severity` is INTEGER 1–3 |
+| `resources` | Community-submitted locations | `approved = false` until moderated; no lat/lon stored — addresses only |
 
 **Privacy enforcement at the schema level:**
 - `features.aggregation_level` is constrained to `(tract, block_group, zip, county, point)`
@@ -46,7 +46,7 @@ Three tables:
 | `src/index.js` | Server bootstrap, middleware chain |
 | `src/db.js` | pg connection pool |
 | `src/routes/layers.js` | GET /layers, GET /layers/:slug |
-| `src/routes/features.js` | GET /features (GeoJSON) |
+| `src/routes/features.js` | GET /features (GeoJSON by bbox; GET /features?point=lng,lat&layers= for point-query across sub-layers) |
 | `src/routes/alerts.js` | GET /alerts |
 | `src/routes/weather.js` | GET /weather (NWS proxy) |
 | `src/routes/resources.js` | POST /resources |
@@ -66,11 +66,13 @@ Security measures:
 | File | Role |
 |---|---|
 | `src/app.js` | Map initialization, event wiring |
-| `src/layers.js` | Layer sidebar, feature loading, click popups |
+| `src/layers.js` | Layer sidebar (with sub-layer grouping toggle), feature loading, info drawer (right panel for polygon layers), click popups |
 | `src/alerts.js` | Alert sidebar, map markers, detail popup |
+| `src/weather.js` | Weather panel, NWS conditions + icon display |
 | `src/api-client.js` | Fetch wrapper |
 | `src/config.js` | Runtime configuration (overridable via window.CG_CONFIG) |
-| `build.js` | esbuild bundler + MapLibre vendor copy |
+| `src/_icons.js` | Auto-generated icon map (Phosphor SVG strings keyed by resource type) — do not edit manually |
+| `build.js` | esbuild bundler + MapLibre vendor copy + Phosphor icon generation (writes `src/_icons.js`) |
 
 **No CDN dependencies:** MapLibre GL JS is copied from `node_modules/maplibre-gl/dist/` to `dist/vendor/` at build time.
 
@@ -88,7 +90,27 @@ User enables layer toggle
   → features route queries PostGIS with ST_MakeEnvelope
   → Returns GeoJSON FeatureCollection (max 5000 features)
   → MapLibre renders as fill + line layers (polygon) or circle (point)
-  → Click → popup showing properties + claim_type + source + trust_rating
+  → Click on polygon → info drawer (right panel) showing properties + claim_type + source + trust_rating
+  → Click on point → popup showing properties + source
+```
+
+### Sub-layer proxy query (Phase 1.5)
+
+```
+User clicks a census tract on the map
+  → layers.js calls GET /features?point=lng,lat&layers=slug1,slug2,...
+  → features route queries each sub-layer for that point location
+  → Returns combined JSONB properties from all matching sub-layers
+  → Info drawer shows cross-layer summary for that tract
+```
+
+### Layer grouping (Phase 1.5)
+
+```
+User toggles "By Source" / "By Data Type" in sidebar
+  → layers.js re-renders sidebar grouping using parent_slug hierarchy
+  → Composite parent layers (is_composite = true) show aggregate indicators
+  → Sub-layers toggle independently within each group
 ```
 
 ### Weather / real-time
@@ -125,10 +147,22 @@ Frontend polls GET /alerts?bbox=W,S,E,N every 5 minutes
 
 ---
 
-## Phase 2 Additions (scoped out of Phase 1)
+## Phase 2 Additions (next)
 
-- Cross-layer signal engine (trigger Tier 1/2 alerts automatically)
+**Phase 2B — Signal Engine:**
+The cross-layer signal engine evaluates alert trigger conditions against live data on a scheduled cadence (initially every 15 minutes for Tier 1, hourly for Tier 2). Architecture:
+- `ingest/scheduler.js` extended with alert evaluation jobs
+- Each alert type has a trigger function that queries PostGIS across layers
+- A new `alerts` write path: evaluated alerts insert/update rows in the `alerts` table
+- The existing `GET /alerts` endpoint serves these with no frontend changes needed
+- Starting signals: T1-E01 (Severe Weather + High SVI), T2-F01 (Food Access Gap), T2-ENV01 (Environmental Burden + Vulnerability) — all require no new data sources
+
+**Phase 2D — Community Resources:**
+- User-facing submission form for community resources
+- Admin moderation UI (`src/routes/admin.js` — planned, not yet implemented)
+- Approved resources surface as points in the `features` layer
+
+**Phase 2 (remaining):**
 - Wisconsin CCAP integration (requires legal review before implementation)
 - ActivityPub prototype
 - Stewardship Council formation
-- User-facing submission moderation UI

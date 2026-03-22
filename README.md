@@ -91,6 +91,15 @@ node run-all.js
 
 See `/ingest/README.md` for data source download instructions.
 
+### 5. Build the frontend
+
+```bash
+cd frontend
+npm run build
+```
+
+This bundles the app, copies MapLibre assets, and generates `src/_icons.js` from Phosphor icons.
+
 ---
 
 ## API Endpoints
@@ -100,6 +109,7 @@ See `/ingest/README.md` for data source download instructions.
 | GET | `/health` | Service health check |
 | GET | `/layers` | List all data layers with metadata |
 | GET | `/features?layer=X&bbox=W,S,E,N` | GeoJSON features in bounding box |
+| GET | `/features?point=lng,lat&layers=X,Y` | Cross-layer point query (sub-layer lookup) |
 | GET | `/alerts?bbox=W,S,E,N&severity=X` | Active alerts for area |
 | GET | `/weather?lat=X&lon=Y` | NWS conditions + alerts (real-time) |
 | POST | `/resources` | Submit a community resource |
@@ -144,8 +154,9 @@ Typography: Courier New for UI chrome, Georgia for body text.
 
 ## Phase Status
 
-- **Phase 1 (Months 1–3):** Foundation — working map, static layers, data pipelines. ← *Current*
-- **Phase 2 (Months 4–6):** Intelligence — cross-layer signal engine, Tier 1/2 alerts, Stewardship Council.
+- **Phase 1 (Months 1–3):** Foundation — working map, static layers, data pipelines. ✅ *Complete*
+- **Phase 1.5:** Sub-layers (25 EJScreen/SVI/CHAS/EvictionLab indicators), info drawer, layer grouping toggle, point-query endpoint. ✅ *Complete*
+- **Phase 2 (Months 4–6):** Intelligence — cross-layer signal engine, Tier 1/2 alerts, Stewardship Council. ← *Next*
 - **Phase 3 (Months 7–12):** Federation — Docker self-hosting, ActivityPub federation.
 
 ---
