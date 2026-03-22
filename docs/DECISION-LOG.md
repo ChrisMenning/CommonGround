@@ -5,6 +5,14 @@ Format: `[DATE] DECISION — rationale`
 
 ---
 
+## 2026-03-22
+
+**[2026-03-22] Epistemic interrogation skill adopted as binding standard** — A formal interrogation method (`project-governance/commonground-epistemic-interrogation/SKILL.md`) is adopted as a binding epistemic standard for all alert copy, trust rating decisions, data assessments, and framing choices in CommonGround. The skill was developed through indirect questioning of Claude that surfaced trained reasoning biases not visible through self-report: false balance applied to asymmetric power relationships, inherited trust ratings that no longer reflect current institutional conditions, and defensive hedging that protects institutional actors at the expense of communities. The five-test checklist (symmetry, institutional deference, hedge direction, recommendation calibration, framing beneficiary) must be applied before any alert copy is finalized or any data source trust rating is assigned. The reference principles document (`references/commonground-principles.md`) operationalizes the Phase 1 claim type taxonomy alongside this framework.
+
+**[2026-03-22] Federal source trust ratings downgraded to reflect 2025-2026 political interference** — EPA EJScreen (5/5 → 3/5), CDC SVI (5/5 → 3/5), USDA Food Access (4/5 → 3/5), HRSA FQHCs (4/5 → 3/5), HUD CHAS (4/5 → 3/5), EPA AirNow (5/5 → 4/5) all have downgraded current-conditions ratings following documented staffing reductions, mandate changes, and program defunding under the current federal administration. USDA SNAP retailer database and Eviction Lab (Princeton) maintain their ratings as the former is administrative infrastructure and the latter is academically independent. All downgraded ratings carry explicit current-conditions notes in `docs/DATA-REGISTRY.md`. The principle: a trust rating is not a permanent property of a source — it is a function of that source's current resourcing, independence, and incentive structure.
+
+---
+
 ## 2026-03-20
 
 **[2026-03-20] AGPL-3.0 license chosen** — Ensures all modifications to CommonGround (including network-served modifications) must be published as open source. Prevents proprietary forks from extracting community value without contributing back.

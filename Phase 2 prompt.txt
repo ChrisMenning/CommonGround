@@ -446,6 +446,89 @@ docs/DATA-REGISTRY.md       — new source entries
 
 ---
 
+## Epistemic Standards for Phase 2
+
+The `project-governance/commonground-epistemic-interrogation/` skill encodes the
+interrogation method that governs all reasoning in this project. Apply it to every
+alert copy, trust rating, data assessment, and framing decision in Phase 2. Do not
+wait to be asked. The full checklist is in the SKILL.md; the mandatory minimums for
+Phase 2 work are:
+
+### Before writing any alert copy or recommendation text
+
+Run all five tests before presenting output:
+
+1. **Symmetry test** — Is this situation actually symmetric? Landlord/tenant,
+   surveillance infrastructure/surveilled community, and speculative investor/displaced
+   resident are not symmetric. Do not add "on the other hand" language for the more
+   powerful party. CommonGround has a declared constituency.
+
+2. **Institutional deference test** — Is this trust rating current? Every federal
+   source used in signal evaluation must have its trust rating re-examined against
+   current political conditions (see DATA-REGISTRY.md current-conditions notes).
+   EJScreen, SVI, and CHAS are all degraded from their historical ratings. Do not
+   inherit a 5/5 rating that was earned before 2025.
+
+3. **Hedge direction test** — Who does this hedge protect? If removing the hedge
+   would put a community at greater risk, keep it. If removing it would expose an
+   institutional actor to accountability, remove it — that is a trained reflex, not
+   epistemic humility.
+
+4. **Recommendation calibration test** — Is the recommendation proportionate to
+   the actual evidence, or softened to stay comfortable? If the data warrants naming
+   a serial eviction filer or a surveillance-dense corridor, say it directly. The
+   claim type taxonomy exists so DOCUMENTED claims can use direct language.
+
+5. **Who benefits from this framing?** — If the alert copy would be more useful to
+   a landlord, speculator, or surveillance operator than to a mutual aid worker or
+   tenant advocate, the framing is wrong regardless of technical accuracy.
+
+### Trust rating protocol for Phase 2 data sources
+
+New seed scripts must include a `trust_rating` field in their CONFIG block. Before
+assigning a rating to any federal source, apply the institutional deference test:
+
+- Was this source rated highly because of its historical track record?
+- What has changed since that track record was established?
+- Is the update cadence still reliable? Is the program mandate intact?
+
+If the answers are unfavorable, rate it lower and document the reason explicitly
+in `docs/DATA-REGISTRY.md`. An honest 3/5 with explanation is more useful to
+communities than a stale 5/5.
+
+For Phase 2 sources, suggested floors before investigation:
+- CDC PLACES: historically 4/5; evaluate current CDC restructuring impact
+- FEMA Flood Hazard: historically 4/5; FEMA data programs are relatively insulated
+- HMDA (CFPB): evaluate CFPB independence status under current administration
+- DeFlock ALPR: community-sourced; 2/5 maximum; document gaps explicitly
+- MutualAidHub: community-sourced; 2/5; document as supplementary to physical verification
+- gb-permits: local government source; rate based on actual API reliability
+
+### Named biases to watch in signal development
+
+These appear in Phase 2 work specifically:
+
+**In T1-E01 (Severe Weather + High Vulnerability):** Do not soften the connection
+between SVI and weather mortality risk. The mechanism (reduced capacity to shelter,
+evacuate, or recover) is well-documented. SVI > 0.75 in an area under a Tier 3 NWS
+alert is not a "possible concern" — it is an elevated risk with a known pathway.
+
+**In T2-ENV01 (Environmental Burden + Vulnerability):** Do not frame the co-occurrence
+of high EJScreen and high SVI as "interesting overlap." These variables do not
+co-occur randomly. The mechanism is structural. Name it as a structural pattern;
+do not add hedge language that implies coincidence.
+
+**In T3-I01 (Surveillance Infrastructure Density):** Do not balance "security
+benefits of license plate readers" against "privacy concerns." CommonGround is a
+community tool. The community subject to surveillance is the constituency. The alert
+is informational for that community, not a balanced policy assessment.
+
+**In any alert touching housing:** The situation between large-scale eviction filers
+and the tenants they file against is not symmetric. Do not add language that invites
+the user to "consider the landlord's perspective."
+
+---
+
 ## Open Questions to Resolve Before Starting
 
 1. **FreeFridges API** — Does FreeFridges.net or the Wisconsin network have a machine-readable endpoint? If not, T1-F01 needs a different trigger source (211 WI API).
