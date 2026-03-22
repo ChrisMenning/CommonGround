@@ -12,6 +12,7 @@ const alertsRouter = require('./routes/alerts');
 const weatherRouter = require('./routes/weather');
 const resourcesRouter = require('./routes/resources');
 const adminRouter = require('./routes/admin');
+const organizeRouter = require('./routes/organize-directory');
 
 const app = express();
 
@@ -61,6 +62,7 @@ app.use('/alerts', alertsRouter);
 app.use('/weather', weatherRouter);
 app.use('/resources', resourcesRouter);
 app.use('/admin', adminRouter);
+app.use('/organize-directory', organizeRouter);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', version: '1.0.0', phase: 1 });

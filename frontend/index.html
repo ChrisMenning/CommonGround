@@ -263,6 +263,48 @@
       scrollbar-color: var(--bark-light) var(--bark);
     }
 
+    #organize-panel {
+      max-height: 220px;
+      overflow-y: auto;
+      border-top: 2px solid var(--border);
+      scrollbar-width: thin;
+      scrollbar-color: var(--bark-light) var(--bark);
+    }
+
+    #organize-panel-header {
+      padding: 8px 16px 4px;
+      font-family: var(--font-label);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      position: sticky;
+      top: 0;
+      background: var(--bark);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .organize-item {
+      padding: 7px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .organize-item a {
+      color: var(--sprout);
+      text-decoration: none;
+      font-family: var(--font-label);
+      font-size: 10px;
+    }
+
+    .organize-item a:hover { text-decoration: underline; }
+
+    .organize-item p {
+      font-size: 9px;
+      color: var(--text-muted);
+      margin: 2px 0 0;
+      line-height: 1.4;
+    }
+
     #alert-panel-header {
       padding: 8px 16px 4px;
       font-family: var(--font-label);
@@ -750,6 +792,16 @@
       </div>
       <div id="alert-list" role="status" aria-live="polite" aria-label="Active alerts">
         <div id="no-alerts-msg">No active alerts for this area.</div>
+      </div>
+    </div>
+
+    <!-- ── Resource submission ── -->
+    <div id="organize-panel">
+      <div id="organize-panel-header">
+        Organizing in Green Bay
+      </div>
+      <div id="organize-list">
+        <div id="organize-loading" style="padding:8px 16px;font-family:var(--font-label);font-size:9px;color:var(--text-muted)">Loading…</div>
       </div>
     </div>
 

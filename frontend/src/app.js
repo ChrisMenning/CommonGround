@@ -36,6 +36,7 @@ map.on('load', async () => {
   await initLayers(map);
   await initAlerts(map);
   await initWeather(map);
+  loadOrganizeDirectory();
 
   // Dismiss loading screen
   const loading = document.getElementById('loading');
@@ -139,4 +140,45 @@ if (resourceToggle && resourceForm) {
 function setStatus(msg) {
   const el = document.getElementById('status-msg');
   if (el) el.textContent = msg;
+}
+
+// ── organize.directory panel ──────────────────────────────────────────────────
+// Fetches the Green Bay page from organize.directory and renders a list of
+// groups in the sidebar panel. Falls back gracefully if the fetch fails.
+
+async function loadOrganizeDirectory() {
+  const list = document.getElementById('organize-list');
+  if (!list) return;
+
+  // Fetch via CORS proxy isn't available here — we use the API backend as a
+  // simple proxy to avoid mixed-content and CORS issues from the browser.
+  // The API proxies GET /organize-directory and returns { groups: [...] }
+  let groups = [];
+  try {
+    const data = await apiFetch('/organize-directory');
+    groups = data.groups || [];
+  } catch {
+    list.innerHTML = '<div style="padding:8px 16px;font-family:var(--font-label);font-size:9px;color:var(--text-muted)">Could not load organize.directory data.</div>';
+    return;
+  }
+
+  list.innerHTML = '';
+  if (groups.length === 0) {
+    list.innerHTML = '<div style="padding:8px 16px;font-family:var(--font-label);font-size:9px;color:var(--text-muted)">No groups listed for this area.</div>';
+    return;
+  }
+
+  for (const g of groups) {
+    const item = document.createElement('div');
+    item.className = 'organize-item';
+    const nameHtml = g.url
+      ? `<a href="${encodeURI(g.url)}" target="_blank" rel="noopener noreferrer">${escHtml(g.name)}</a>`
+      : `<span style="font-family:var(--font-label);font-size:10px;color:var(--text-secondary)">${escHtml(g.name)}</span>`;
+    item.innerHTML = nameHtml + (g.description ? `<p>${escHtml(g.description)}</p>` : '');
+    list.appendChild(item);
+  }
+}
+
+function escHtml(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }

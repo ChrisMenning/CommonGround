@@ -19,7 +19,7 @@ const BROWN_COUNTY_BBOX = '44.24,-88.25,44.74,-87.82';
 
 const QUERY = `[out:json][timeout:60];
 (
-  node["amenity"~"^(community_centre|social_facility|clinic|health_centre|library|food_bank|shelter|place_of_worship)$"](${BROWN_COUNTY_BBOX});
+  node["amenity"~"^(community_centre|social_facility|clinic|health_centre|library|food_bank|shelter|place_of_worship|community_fridge)$"](${BROWN_COUNTY_BBOX});
   node["leisure"="park"](${BROWN_COUNTY_BBOX});
   node["shop"="food_bank"](${BROWN_COUNTY_BBOX});
 );
@@ -77,6 +77,7 @@ async function run() {
     food_bank:        'Food Pantry / Food Bank',
     shelter:          'Emergency Shelter',
     place_of_worship: 'Place of Worship / Community Hub',
+    community_fridge: 'Community Fridge',
     park:             'Park',
   };
 

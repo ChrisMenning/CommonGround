@@ -16,7 +16,7 @@ import ICONS from './_icons.js';
 /* global maplibregl */
 
 // â”€â”€ Point layers â€” these use standard popup, NOT the drawer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const POINT_LAYER_SLUGS = new Set(['fqhc', 'snap-retailers', 'airnow', 'osm-resources']);
+const POINT_LAYER_SLUGS = new Set(['fqhc', 'snap-retailers', 'airnow', 'osm-resources', 'mutual-aid']);
 
 // ── Sidebar icon assignment — maps layer slug → ICONS key ────────────────────
 const SIDEBAR_ICON = {
@@ -59,6 +59,7 @@ const SIDEBAR_ICON = {
   'osm-resources':          'community_centre',
   'neighborhood-assoc':     'social_facility',
   'gb-permits':             'community_centre',
+  'mutual-aid':             'social_facility',
 };
 
 // Render a Phosphor SVG as a 14×14 img element colored with `color`.
@@ -83,6 +84,9 @@ function makeSidebarIcon(key, color) {
 const GROUPS_BY_SOURCE = {
   'Neighborhoods': [
     'neighborhood-assoc',
+  ],
+  'Mutual Aid & Organizing': [
+    'mutual-aid',
   ],
   'EPA EJScreen': [
     'ejscreen-ej-score','ejscreen-ozone','ejscreen-pm25','ejscreen-traffic','ejscreen-rmp',
@@ -119,9 +123,13 @@ const GROUPS_BY_SOURCE = {
   ],
 };
 
+
 const GROUPS_BY_TYPE = {
   'Neighborhoods': [
     'neighborhood-assoc',
+  ],
+  'Mutual Aid & Organizing': [
+    'mutual-aid',
   ],
   'Environmental Burden': [
     'ejscreen-ej-score','ejscreen-ozone','ejscreen-pm25','ejscreen-traffic','ejscreen-rmp',
@@ -1439,9 +1447,20 @@ function showPointPopup(lngLat, layer, props) {
           </div>
         </div>`;
     }
+  } else if (layer.slug === 'mutual-aid') {
+    const cats = props.categories ? `<div style="font-size:9px;color:var(--text-muted);margin-bottom:4px">${escHtml(props.categories)}</div>` : '';
+    const desc = props.description ? `<p style="font-size:10px;line-height:1.5;color:var(--text-secondary);margin:0 0 6px">${escHtml(props.description)}</p>` : '';
+    const urlLink = props.url ? `<a href="${escHtml(props.url)}" target="_blank" rel="noopener noreferrer" style="font-size:10px;color:var(--sprout)">${escHtml(props.url)}</a>` : '';
+    const emailLink = props.email ? `<div style="font-size:10px;color:var(--text-secondary)">Email: ${escHtml(props.email)}</div>` : '';
+    const phoneLink = props.phone ? `<div style="font-size:10px;color:var(--text-secondary)">Phone: ${escHtml(props.phone)}</div>` : '';
+    headerHtml = `<div style="margin-bottom:6px">${cats}${desc}${urlLink}${emailLink}${phoneLink}</div>`;
   }
 
-  const SKIP_POPUP = new Set(['osm_id', 'source', 'osm_timestamp', '_layer', '_aggregation_level', '_last_updated', 'amenity']);
+  const SKIP_POPUP = new Set([
+    'osm_id', 'source', 'osm_timestamp', '_layer', '_aggregation_level', '_last_updated', 'amenity',
+    // mutual-aid fields — rendered in headerHtml above
+    'description', 'url', 'email', 'phone', 'categories', 'attribution', 'notes',
+  ]);
   const entries = Object.entries(props)
     .filter(([k]) => !SKIP_POPUP.has(k) && !k.startsWith('_'))
     .slice(0, 10);

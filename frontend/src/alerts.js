@@ -88,7 +88,9 @@ function renderAlertSidebar(alerts) {
   _setAlertIndicator(true, minSeverity);
 
   alerts.forEach(alert => {
-    const isVisible = _alertVisible.get(alert.id) !== false; // default true
+    // Default new alerts to hidden on the map; user must opt-in
+    if (!_alertVisible.has(alert.id)) _alertVisible.set(alert.id, false);
+    const isVisible = _alertVisible.get(alert.id) === true;
     const item = document.createElement('div');
     item.className = `alert-item alert-severity-${alert.severity}${isVisible ? ' map-visible' : ''}`;
     item.setAttribute('role', 'button');
@@ -213,7 +215,7 @@ function renderAlertMarkers(alerts) {
 }
 
 function toggleAlertMap(alert, itemEl) {
-  const wasVisible = _alertVisible.get(alert.id) !== false;
+  const wasVisible = _alertVisible.get(alert.id) === true;
   const isVisible  = !wasVisible;
   _alertVisible.set(alert.id, isVisible);
   itemEl.classList.toggle('map-visible', isVisible);

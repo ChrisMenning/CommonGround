@@ -20,6 +20,7 @@ const SCRIPTS = [
   { name: 'FQHC (HRSA)',          file: 'seeds/fqhc.js',           manual: false },
   { name: 'OSM Resources',        file: 'seeds/osm-resources.js',   manual: false },
   { name: 'GB Permits',           file: 'seeds/gb-permits.js',      manual: false },
+  { name: 'Mutual Aid',           file: 'seeds/mutual-aid.js',      manual: false },
   { name: 'AirNow',               file: 'seeds/airnow.js',          manual: false },
   { name: 'SNAP Retailers',       file: 'seeds/snap-retailers.js',  manual: false },
   { name: 'Food Access (USDA)',    file: 'seeds/food-access.js',     manual: true  },
