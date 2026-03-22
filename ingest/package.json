@@ -14,7 +14,9 @@
     "ingest:eviction-lab":  "node seeds/eviction-lab.js",
     "ingest:osm":           "node seeds/osm-resources.js",
     "ingest:all":           "node run-all.js",
-    "schedule":             "node scheduler.js"
+    "schedule":             "node scheduler.js",
+    "signals":              "node signal-engine.js",
+    "signals:once":         "ONCE=1 node signal-engine.js"
   },
   "dependencies": {
     "adm-zip":   "^0.5.10",

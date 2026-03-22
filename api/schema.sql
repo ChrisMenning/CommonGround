@@ -103,3 +103,19 @@ INSERT INTO layers (slug, name, description, source, source_url, trust_rating, c
   ('osm-resources', 'Community Infrastructure',      'OpenStreetMap community facilities (parks, libraries, clinics)', 'OpenStreetMap / Overpass API',  'https://overpass-api.de/',                                           3, 'DOCUMENTED', 'weekly',    'point',       'point',   '#7FA843', 'Current'),
   ('neighborhood-assoc', 'Neighborhood Associations', 'City of Green Bay neighborhood association boundaries. Active associations shown in teal; inactive (currently reorganizing) in gray.', 'City of Green Bay GIS', 'https://map.greenbaywi.gov/server/rest/services/CED/NeighborhoodAssociations/MapServer/0', 4, 'DOCUMENTED', 'quarterly', 'neighborhood', 'polygon', '#2196A5', '2024')
 ON CONFLICT (slug) DO NOTHING;
+
+-- ============================================================
+-- signal_runs — audit log for signal engine evaluations
+-- Added Phase 2
+-- ============================================================
+CREATE TABLE IF NOT EXISTS signal_runs (
+  id          SERIAL PRIMARY KEY,
+  alert_type  TEXT NOT NULL,
+  run_at      TIMESTAMPTZ DEFAULT NOW(),
+  triggered   INTEGER DEFAULT 0,
+  expired     INTEGER DEFAULT 0,
+  error       TEXT
+);
+
+CREATE INDEX IF NOT EXISTS signal_runs_alert_type_idx ON signal_runs(alert_type);
+CREATE INDEX IF NOT EXISTS signal_runs_run_at_idx     ON signal_runs(run_at);
