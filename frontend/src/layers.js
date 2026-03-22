@@ -81,6 +81,9 @@ function makeSidebarIcon(key, color) {
 
 // â”€â”€ Grouping definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const GROUPS_BY_SOURCE = {
+  'Neighborhoods': [
+    'neighborhood-assoc',
+  ],
   'EPA EJScreen': [
     'ejscreen-ej-score','ejscreen-ozone','ejscreen-pm25','ejscreen-traffic','ejscreen-rmp',
     'ejscreen-minority','ejscreen-under5','ejscreen-over64','ejscreen-low-income','ejscreen-less-hs',
@@ -112,12 +115,14 @@ const GROUPS_BY_SOURCE = {
     'osm-resources',
   ],
   'City of Green Bay': [
-    'neighborhood-assoc',
     'gb-permits',
   ],
 };
 
 const GROUPS_BY_TYPE = {
+  'Neighborhoods': [
+    'neighborhood-assoc',
+  ],
   'Environmental Burden': [
     'ejscreen-ej-score','ejscreen-ozone','ejscreen-pm25','ejscreen-traffic','ejscreen-rmp',
     'airnow',
@@ -141,7 +146,7 @@ const GROUPS_BY_TYPE = {
     'fqhc',
   ],
   'Community Infrastructure': [
-    'osm-resources','neighborhood-assoc','gb-permits',
+    'osm-resources','gb-permits',
   ],
 };
 
@@ -290,6 +295,9 @@ export async function initLayers(map) {
 
   layers.forEach(l => { _layerMeta[l.slug] = l; });
   renderLayerControls(layers);
+  // Enable Neighborhoods layer by default
+  const naLayer = layers.find(l => l.slug === 'neighborhood-assoc');
+  if (naLayer) await enableLayer(naLayer);
   initDrawer(map);
 }
 

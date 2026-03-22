@@ -36,6 +36,18 @@ const ALERT_LAYERS = {
 
 let _focusedAlertId = null;
 
+function _setAlertIndicator(active, severity) {
+  const el = document.getElementById('alert-indicator');
+  if (!el) return;
+  if (!active) {
+    el.classList.remove('active', 'sev-1', 'sev-2', 'sev-3');
+    return;
+  }
+  el.classList.add('active');
+  el.classList.remove('sev-1', 'sev-2', 'sev-3');
+  el.classList.add(`sev-${severity}`);
+}
+
 export async function initAlerts(map) {
   _map = map;
   await refreshAlerts();
@@ -66,11 +78,14 @@ function renderAlertSidebar(alerts) {
   if (alerts.length === 0) {
     list.innerHTML = '<div id="no-alerts-msg">No active alerts for this area.</div>';
     badge.style.display = 'none';
+    _setAlertIndicator(false, 0);
     return;
   }
 
   badge.style.display = '';
   badge.textContent = String(alerts.length);
+  const minSeverity = Math.min(...alerts.map(a => a.severity));
+  _setAlertIndicator(true, minSeverity);
 
   alerts.forEach(alert => {
     const isVisible = _alertVisible.get(alert.id) !== false; // default true
