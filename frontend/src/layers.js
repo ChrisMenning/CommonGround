@@ -80,30 +80,38 @@ function makeSidebarIcon(key, color) {
 
 // â”€â”€ Grouping definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const GROUPS_BY_SOURCE = {
-  'Environmental': [
+  'EPA EJScreen': [
     'ejscreen-ej-score','ejscreen-ozone','ejscreen-pm25','ejscreen-traffic','ejscreen-rmp',
-    'airnow',
-  ],
-  'Population': [
     'ejscreen-minority','ejscreen-under5','ejscreen-over64','ejscreen-low-income','ejscreen-less-hs',
   ],
-  'Social Vulnerability': [
+  'EPA AirNow': [
+    'airnow',
+  ],
+  'CDC / ATSDR Social Vulnerability Index': [
     'svi-overall','svi-socioeconomic','svi-household','svi-minority-language','svi-housing-transit',
   ],
-  'Housing': [
+  'HUD CHAS (Housing Needs)': [
     'chas-cost-burdened','chas-severe-burden','chas-renter-burden',
+  ],
+  'Princeton Eviction Lab': [
     'eviction-filing-rate','eviction-rate','eviction-rent-burden',
     'eviction-renter-pct','eviction-poverty',
     'eviction-median-rent','eviction-median-income',
   ],
-  'Food Access': [
-    'food-access','snap-retailers',
+  'USDA Economic Research Service': [
+    'food-access',
   ],
-  'Health': [
+  'USDA SNAP Retailer Locator': [
+    'snap-retailers',
+  ],
+  'HRSA Federally Qualified Health Centers': [
     'fqhc',
   ],
-  'Community': [
-    'osm-resources','neighborhood-assoc',
+  'OpenStreetMap': [
+    'osm-resources',
+  ],
+  'Neighborhood Associations': [
+    'neighborhood-assoc',
   ],
 };
 

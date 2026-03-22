@@ -14,8 +14,9 @@ import { enableLayerBySlug, openDrawerWithContent } from './layers.js';
 /* global maplibregl */
 
 let _map = null;
-let _alertMarkers = [];
-let _alertPolygonSources = [];  // track MapLibre source IDs for polygon alerts
+let _alertMarkerMap     = new Map(); // alert.id → Marker for point alerts
+let _alertPolygonSources = [];        // MapLibre source IDs for polygon alert layers
+let _alertVisible       = new Map(); // alert.id → boolean  (default: true = visible)
 
 const SEVERITY_LABEL = { 1: 'TIER 1 — IMMEDIATE', 2: 'TIER 2 — EMERGING', 3: 'TIER 3 — AWARENESS' };
 
@@ -72,15 +73,24 @@ function renderAlertSidebar(alerts) {
   badge.textContent = String(alerts.length);
 
   alerts.forEach(alert => {
+    const isVisible = _alertVisible.get(alert.id) !== false; // default true
     const item = document.createElement('div');
-    item.className = `alert-item alert-severity-${alert.severity}`;
+    item.className = `alert-item alert-severity-${alert.severity}${isVisible ? ' map-visible' : ''}`;
     item.innerHTML = `
-      <div class="alert-title">${escHtml(alert.title)}</div>
+      <div class="alert-header">
+        <div class="alert-title">${escHtml(alert.title)}</div>
+        <div class="alert-map-toggle" title="Toggle map visibility"></div>
+      </div>
       <div class="alert-meta">
         <span class="claim-badge claim-${escHtml(alert.claim_type)}">${escHtml(alert.claim_type)}</span>
         <span>${escHtml(SEVERITY_LABEL[alert.severity] || `TIER ${alert.severity}`)}</span>
       </div>`;
 
+    // Toggle stops propagation so it doesn't open the detail drawer
+    item.querySelector('.alert-map-toggle').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleAlertMap(alert, item);
+    });
     item.addEventListener('click', () => showAlertDetail(alert));
     list.appendChild(item);
   });
@@ -91,8 +101,8 @@ function renderAlertMarkers(alerts) {
   _focusedAlertId = null;
 
   // Clear existing point markers
-  _alertMarkers.forEach(m => m.remove());
-  _alertMarkers = [];
+  _alertMarkerMap.forEach(m => m.remove());
+  _alertMarkerMap = new Map();
 
   // Clear existing polygon alert layers (including any focus rings)
   _alertPolygonSources.forEach(sourceId => {
@@ -126,11 +136,12 @@ function renderAlertMarkers(alerts) {
         box-shadow: 0 0 6px rgba(0,0,0,0.5);
       `;
       el.addEventListener('click', () => showAlertDetail(alert));
+      if (_alertVisible.get(alert.id) === false) el.style.display = 'none';
 
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([lng, lat])
         .addTo(_map);
-      _alertMarkers.push(marker);
+      _alertMarkerMap.set(alert.id, marker);
 
     } else if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
       const sourceId = `cg-alert-${alert.id}`;
@@ -156,14 +167,33 @@ function renderAlertMarkers(alerts) {
       _map.on('click', `${sourceId}-fill`, () => showAlertDetail(alert));
       _map.on('mouseenter', `${sourceId}-fill`, () => { _map.getCanvas().style.cursor = 'pointer'; });
       _map.on('mouseleave', `${sourceId}-fill`, () => { _map.getCanvas().style.cursor = ''; });
+
+      // Apply initial visibility based on toggle state
+      if (_alertVisible.get(alert.id) === false) {
+        _map.setLayoutProperty(`${sourceId}-fill`,    'visibility', 'none');
+        _map.setLayoutProperty(`${sourceId}-outline`, 'visibility', 'none');
+      }
     }
   });
 }
 
-function showAlertDetail(alert) {
-  // Activate the data layers relevant to this alert type
-  (ALERT_LAYERS[alert.alert_type] || []).forEach(slug => enableLayerBySlug(slug));
+function toggleAlertMap(alert, itemEl) {
+  const wasVisible = _alertVisible.get(alert.id) !== false;
+  const isVisible  = !wasVisible;
+  _alertVisible.set(alert.id, isVisible);
+  itemEl.classList.toggle('map-visible', isVisible);
 
+  const vis      = isVisible ? 'visible' : 'none';
+  const sourceId = `cg-alert-${alert.id}`;
+  if (_map.getLayer(`${sourceId}-fill`))    _map.setLayoutProperty(`${sourceId}-fill`,    'visibility', vis);
+  if (_map.getLayer(`${sourceId}-outline`)) _map.setLayoutProperty(`${sourceId}-outline`, 'visibility', vis);
+
+  // Point markers don't use MapLibre layers — toggle display directly
+  const marker = _alertMarkerMap.get(alert.id);
+  if (marker) marker.getElement().style.display = isVisible ? '' : 'none';
+}
+
+function showAlertDetail(alert) {
   // Highlight the affected area on the map and fly to it
   _focusAlert(alert);
 
@@ -293,6 +323,26 @@ function buildAlertDrawerContent(alert) {
     </div>
     ${triggerHtml}
   `;
+
+  // Related data layer activation buttons (DOM-built to respect CSP)
+  const relatedSlugs = ALERT_LAYERS[alert.alert_type] || [];
+  if (relatedSlugs.length > 0) {
+    const sec = document.createElement('div');
+    sec.style.cssText = 'padding:10px 14px;border-bottom:1px solid var(--border)';
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'font-family:var(--font-label);font-size:8px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px';
+    lbl.textContent = 'Related Data Layers';
+    sec.appendChild(lbl);
+    relatedSlugs.forEach(slug => {
+      const btn = document.createElement('button');
+      btn.style.cssText = 'display:block;width:100%;text-align:left;padding:5px 8px;margin-bottom:3px;font-family:var(--font-label);font-size:10px;color:var(--sprout);background:var(--bark-light);border:1px solid var(--border);border-radius:2px;cursor:pointer';
+      btn.textContent = '\u2192\u00a0' + slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      btn.addEventListener('click', () => enableLayerBySlug(slug));
+      sec.appendChild(btn);
+    });
+    div.appendChild(sec);
+  }
+
   return div;
 }
 

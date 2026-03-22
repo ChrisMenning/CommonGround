@@ -278,7 +278,46 @@
       font-family: var(--font-label);
       font-size: 11px;
       color: var(--text-primary);
+    }
+
+    .alert-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 6px;
       margin-bottom: 3px;
+    }
+
+    .alert-map-toggle {
+      width: 28px; height: 14px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--bark-light);
+      position: relative;
+      flex-shrink: 0;
+      margin-top: 1px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .alert-map-toggle::after {
+      content: '';
+      position: absolute;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      top: 1px; left: 1px;
+      transition: transform 0.15s, background 0.15s;
+    }
+
+    .alert-item.map-visible .alert-map-toggle {
+      background: var(--leaf);
+      border-color: var(--sprout);
+    }
+
+    .alert-item.map-visible .alert-map-toggle::after {
+      transform: translateX(14px);
+      background: var(--sprout);
     }
 
     .alert-meta {
