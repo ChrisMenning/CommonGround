@@ -16,6 +16,10 @@ let _resourcesFilter = 'pending'; // 'pending' | 'approved'
 // Cached modal context for save handler
 let _modalCtx = null;
 
+// Cached data — populated on load, reused by edit handlers
+let _sourcesCache = [];
+let _layersCache  = [];
+
 // ── Token management ──────────────────────────────────────────────────────────
 
 function getToken()    { return sessionStorage.getItem('cg_admin_token') || ''; }
@@ -153,7 +157,8 @@ async function loadSources() {
   container.innerHTML = '<div class="empty-state">Loading…</div>';
   try {
     const data = await api('GET', '/admin/sources');
-    renderSourcesTable(data.sources);
+    _sourcesCache = data.sources || [];
+    renderSourcesTable(_sourcesCache);
   } catch (err) {
     container.innerHTML = `<div class="empty-state text-danger">Error: ${escHtml(err.message)}</div>`;
   }
@@ -175,8 +180,8 @@ function renderSourcesTable(sources) {
       <td>${escHtml(s.endpoint_format || '')}</td>
       <td class="cell-note" title="${escHtml(s.status_note || '')}">${escHtml(s.status_note || '')}</td>
       <td class="actions">
-        <button class="btn btn-sm" onclick="editSource(${s.id})">EDIT</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteSource(${s.id}, '${escHtml(s.slug)}')">DEL</button>
+        <button class="btn btn-sm" data-action="edit-source" data-id="${s.id}">EDIT</button>
+        <button class="btn btn-sm btn-danger" data-action="delete-source" data-id="${s.id}" data-slug="${escHtml(s.slug)}">DEL</button>
       </td>
     </tr>
   `).join('');
@@ -200,15 +205,28 @@ function renderSourcesTable(sources) {
   `;
 }
 
-window.editSource = async function editSource(id) {
-  let src;
+// Event delegation for sources table
+document.getElementById('sources-table').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  if (action === 'edit-source')   editSource(parseInt(btn.dataset.id, 10));
+  if (action === 'delete-source') deleteSource(parseInt(btn.dataset.id, 10), btn.dataset.slug);
+});
+
+async function editSource(id) {
   try {
-    const data = await api('GET', '/admin/sources');
-    src = data.sources.find(s => s.id === id);
-  } catch (err) {
-    toast(`Could not load source: ${err.message}`, true);
-    return;
-  }
+    // Use cache; fall back to a fresh fetch if cache is empty
+    let src = _sourcesCache.find(s => s.id === id);
+    if (!src) {
+      const data = await api('GET', '/admin/sources');
+      _sourcesCache = data.sources || [];
+      src = _sourcesCache.find(s => s.id === id);
+    }
+    if (!src) {
+      toast(`Source with id ${id} not found — try refreshing the page.`, true);
+      return;
+    }
 
   openModal('EDIT DATA SOURCE', `
     <div class="form-row">
@@ -277,9 +295,12 @@ window.editSource = async function editSource(id) {
     toast('Source config saved.');
     loadSources();
   });
-};
+  } catch (err) {
+    toast(`Edit failed: ${err.message}`, true);
+  }
+}
 
-window.deleteSource = async function deleteSource(id, slug) {
+async function deleteSource(id, slug) {
   if (!confirm(`Delete source config for "${slug}"? This cannot be undone.`)) return;
   try {
     await api('DELETE', `/admin/sources/${id}`);
@@ -288,7 +309,7 @@ window.deleteSource = async function deleteSource(id, slug) {
   } catch (err) {
     toast(`Error: ${err.message}`, true);
   }
-};
+}
 
 document.getElementById('add-source-btn').addEventListener('click', () => {
   openModal('NEW DATA SOURCE', `
@@ -367,7 +388,8 @@ async function loadLayers() {
   container.innerHTML = '<div class="empty-state">Loading…</div>';
   try {
     const data = await api('GET', '/admin/layers');
-    renderLayersTable(data.layers);
+    _layersCache = data.layers || [];
+    renderLayersTable(_layersCache);
   } catch (err) {
     container.innerHTML = `<div class="empty-state text-danger">Error: ${escHtml(err.message)}</div>`;
   }
@@ -389,7 +411,7 @@ function renderLayersTable(layers) {
       <td class="text-muted">${escHtml(l.data_vintage || '—')}</td>
       <td><span style="color:${escHtml(l.color || '#fff')};font-family:monospace">${escHtml(l.color || '—')}</span></td>
       <td class="actions">
-        <button class="btn btn-sm" onclick="editLayer('${escHtml(l.slug)}')">EDIT</button>
+        <button class="btn btn-sm" data-action="edit-layer" data-slug="${escHtml(l.slug)}">EDIT</button>
       </td>
     </tr>
   `).join('');
@@ -413,15 +435,25 @@ function renderLayersTable(layers) {
   `;
 }
 
-window.editLayer = async function editLayer(slug) {
-  let layer;
+// Event delegation for layers table
+document.getElementById('layers-table').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  if (btn.dataset.action === 'edit-layer') editLayer(btn.dataset.slug);
+});
+
+async function editLayer(slug) {
   try {
-    const data = await api('GET', '/admin/layers');
-    layer = data.layers.find(l => l.slug === slug);
-  } catch (err) {
-    toast(`Could not load layer: ${err.message}`, true);
-    return;
-  }
+    let layer = _layersCache.find(l => l.slug === slug);
+    if (!layer) {
+      const data = await api('GET', '/admin/layers');
+      _layersCache = data.layers || [];
+      layer = _layersCache.find(l => l.slug === slug);
+    }
+    if (!layer) {
+      toast(`Layer "${slug}" not found — try refreshing the page.`, true);
+      return;
+    }
 
   openModal(`EDIT LAYER — ${slug}`, `
     <div class="form-group">
@@ -501,7 +533,10 @@ window.editLayer = async function editLayer(slug) {
     toast('Layer updated.');
     loadLayers();
   });
-};
+  } catch (err) {
+    toast(`Edit failed: ${err.message}`, true);
+  }
+}
 
 // ── Resources tab ─────────────────────────────────────────────────────────────
 
@@ -556,8 +591,8 @@ function renderResourcesTable(resources) {
       <td class="cell-note">${escHtml(r.description || '—')}</td>
       <td class="text-muted" style="font-size:11px;white-space:nowrap">${fmtDate(r.submitted_at)}</td>
       <td class="actions">
-        ${!r.approved ? `<button class="btn btn-sm btn-primary" onclick="approveResource(${r.id})">APPROVE</button>` : ''}
-        <button class="btn btn-sm btn-danger" onclick="deleteResource(${r.id})">DELETE</button>
+        ${!r.approved ? `<button class="btn btn-sm btn-primary" data-action="approve-resource" data-id="${r.id}">APPROVE</button>` : ''}
+        <button class="btn btn-sm btn-danger" data-action="delete-resource" data-id="${r.id}">DELETE</button>
       </td>
     </tr>
   `).join('');
@@ -578,9 +613,18 @@ function renderResourcesTable(resources) {
       <tbody>${rows}</tbody>
     </table>
   `;
+
+  // Event delegation — attached fresh each render since the table is replaced
+  container.querySelector('tbody').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const id = parseInt(btn.dataset.id, 10);
+    if (btn.dataset.action === 'approve-resource') approveResource(id);
+    if (btn.dataset.action === 'delete-resource')  deleteResource(id);
+  });
 }
 
-window.approveResource = async function approveResource(id) {
+async function approveResource(id) {
   try {
     await api('POST', `/admin/resources/${id}/approve`);
     toast('Resource approved and visible on map.');
@@ -588,9 +632,9 @@ window.approveResource = async function approveResource(id) {
   } catch (err) {
     toast(`Error: ${err.message}`, true);
   }
-};
+}
 
-window.deleteResource = async function deleteResource(id) {
+async function deleteResource(id) {
   if (!confirm('Delete this resource submission? This cannot be undone.')) return;
   try {
     await api('DELETE', `/admin/resources/${id}`);
