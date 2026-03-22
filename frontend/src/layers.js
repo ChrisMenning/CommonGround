@@ -820,6 +820,12 @@ async function openDrawer(lngLat, slugs) {
   let anyData = false;
   const featureMap = results.features || {};
 
+  // If a neighborhood association was clicked, update the drawer title
+  const naFeature = featureMap['neighborhood-assoc'];
+  if (naFeature && naFeature.properties.name) {
+    if (titleEl) titleEl.textContent = naFeature.properties.name;
+  }
+
   slugs.forEach((slug, idx) => {
     const layer = _layerMeta[slug];
     if (!layer) return;
@@ -834,6 +840,23 @@ async function openDrawer(lngLat, slugs) {
     msg.style.cssText = 'padding:12px 14px;font-family:var(--font-label);font-size:10px;color:var(--text-muted)';
     msg.textContent = 'No data at this location for the active layers.';
     body.appendChild(msg);
+  }
+
+  // Asynchronously load Fast Facts for the clicked neighborhood
+  if (naFeature && naFeature.properties._id) {
+    const ffId = naFeature.properties._id;
+    const ffDiv = body.querySelector(`[data-ff-id="${ffId}"]`);
+    if (ffDiv) {
+      apiFetch(`/features/neighborhood-context?feature_id=${ffId}`)
+        .then(data => {
+          if (!ffDiv.isConnected) return;
+          ffDiv.innerHTML = '';
+          ffDiv.appendChild(buildFastFactsSection(data));
+        })
+        .catch(() => {
+          if (ffDiv.isConnected) ffDiv.innerHTML = '';
+        });
+    }
   }
 }
 
@@ -883,12 +906,13 @@ function buildDrawerCard(layer, props, autoExpand) {
   if (metricEl) header.appendChild(metricEl);
   header.appendChild(chevron);
 
+  const maxH = layer.slug === 'neighborhood-assoc' ? '3000px' : '500px';
   const body = document.createElement('div');
-  body.style.cssText = `padding:0 14px ${autoExpand ? '10px' : '0'};overflow:hidden;max-height:${autoExpand ? '500px' : '0'};transition:max-height 0.2s ease,padding 0.2s ease`;
+  body.style.cssText = `padding:0 14px ${autoExpand ? '10px' : '0'};overflow:hidden;max-height:${autoExpand ? maxH : '0'};transition:max-height 0.35s ease,padding 0.2s ease`;
 
   header.addEventListener('click', () => {
     const isOpen = body.style.maxHeight !== '0px' && body.style.maxHeight !== '0';
-    body.style.maxHeight = isOpen ? '0' : '500px';
+    body.style.maxHeight = isOpen ? '0' : maxH;
     body.style.paddingBottom = isOpen ? '0' : '10px';
     chevron.style.transform = isOpen ? 'rotate(-90deg)' : '';
   });
@@ -899,7 +923,18 @@ function buildDrawerCard(layer, props, autoExpand) {
     noData.textContent = 'No data at this location.';
     body.appendChild(noData);
   } else if (layer.slug === 'neighborhood-assoc') {
-    body.innerHTML = buildNeighborhoodBody(props);
+    // Contact / meeting info
+    const infoDiv = document.createElement('div');
+    infoDiv.innerHTML = buildNeighborhoodBody(props);
+    body.appendChild(infoDiv);
+    // Async fast-facts placeholder (populated by openDrawer after this card is built)
+    if (props._id) {
+      const ffDiv = document.createElement('div');
+      ffDiv.dataset.ffId = props._id;
+      ffDiv.style.cssText = 'margin-top:6px;border-top:1px solid var(--border);padding-top:6px';
+      ffDiv.innerHTML = '<div style="font-family:var(--font-label);font-size:9px;color:var(--text-muted);padding:2px 0">Loading neighborhood context\u2026</div>';
+      body.appendChild(ffDiv);
+    }
   } else {
     body.innerHTML = buildChoroplethBody(layer, props, choropleth, labelCfg);
   }
@@ -984,6 +1019,393 @@ function buildNeighborhoodBody(props) {
 }
 
 // â”€â”€ Point layer popup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+// -- Neighborhood Fast Facts section ------------------------------------------
+// Returns a DOM element. Called after the neighborhood drawer card is built.
+// data = { infrastructure, stats, demographics: { population?, economics? } }
+function buildFastFactsSection(data) {
+  const { infrastructure = [], stats = [], demographics = {} } = data;
+
+  const root = document.createElement('div');
+
+  if (infrastructure.length === 0 && stats.length === 0 && !demographics.population && !demographics.economics) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'font-family:var(--font-label);font-size:9px;color:var(--text-muted);padding:2px 0';
+    empty.textContent = 'No additional data found for this neighborhood.';
+    root.appendChild(empty);
+    return root;
+  }
+
+  // ── Section header with methodology disclosure ───────────────────────────
+  const headerRow = document.createElement('div');
+  headerRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px';
+
+  const headerLabel = document.createElement('div');
+  headerLabel.style.cssText = 'font-family:var(--font-label);font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted)';
+  headerLabel.textContent = 'Fast Facts';
+
+  const howBtn = document.createElement('button');
+  howBtn.style.cssText = [
+    'background:none;border:1px solid var(--border);border-radius:3px',
+    'color:var(--text-muted);font-family:var(--font-label);font-size:8px',
+    'letter-spacing:0.06em;padding:1px 5px;cursor:pointer;line-height:1.4',
+    'transition:color 0.1s,border-color 0.1s',
+  ].join(';');
+  howBtn.textContent = 'HOW CALCULATED?';
+  howBtn.setAttribute('aria-expanded', 'false');
+
+  const methodBox = document.createElement('div');
+  methodBox.style.cssText = [
+    'overflow:hidden;max-height:0;transition:max-height 0.25s ease',
+    'margin-bottom:0;font-family:var(--font-body);font-size:10px',
+    'color:var(--text-secondary);line-height:1.55',
+    'background:rgba(255,255,255,0.03);border-radius:3px',
+  ].join(';');
+  methodBox.innerHTML = [
+    '<div style="padding:8px 10px">',
+    '<p style="margin:0 0 5px;font-weight:600;font-size:10px">Infrastructure counts</p>',
+    '<p style="margin:0 0 8px">Each location listed has map coordinates that fall inside this neighborhood boundary. Counts are exact.</p>',
+    '<p style="margin:0 0 5px;font-weight:600;font-size:10px">Neighborhood indicators</p>',
+    '<p style="margin:0 0 5px">EJScreen, SVI, HUD CHAS, and Eviction Lab use census units (block groups or tracts) that rarely align with neighborhood lines. Each overlapping unit contributes proportionally to its intersection area:</p>',
+    '<p style="margin:0 0 6px;padding-left:8px;border-left:2px solid var(--border);font-family:var(--font-label);font-size:9px;color:var(--text-muted)">',
+    'weighted avg = &Sigma;(value\u1d62 &times; area\u1d62) / &Sigma;(area\u1d62)',
+    '</p>',
+    '<p style="margin:0 0 5px;font-weight:600;font-size:10px">Population profile</p>',
+    '<p style="margin:0 0 5px">Population counts use <em>areal interpolation</em>: each census tract contributes a share of its population proportional to how much of it falls inside the neighborhood boundary:</p>',
+    '<p style="margin:0 0 6px;padding-left:8px;border-left:2px solid var(--border);font-family:var(--font-label);font-size:9px;color:var(--text-muted)">',
+    'est. pop = &Sigma;(pop\u1d62 &times; intersection_area\u1d62 / tract_area\u1d62)',
+    '</p>',
+    '<p style="margin:0 0 4px">This assumes uniform population distribution within each tract. Results are estimates. The <em>% covered</em> note shows what fraction of the neighborhood has data.</p>',
+    '<p style="margin:0;font-size:9px;color:var(--text-muted)">Layers shown here are independent of which layers are toggled in the sidebar.</p>',
+    '</div>',
+  ].join('');
+
+  howBtn.addEventListener('click', () => {
+    const isOpen = methodBox.style.maxHeight !== '0px' && methodBox.style.maxHeight !== '0';
+    if (isOpen) {
+      methodBox.style.maxHeight = '0';
+      methodBox.style.marginBottom = '0';
+      howBtn.setAttribute('aria-expanded', 'false');
+    } else {
+      methodBox.style.maxHeight = '700px';
+      methodBox.style.marginBottom = '8px';
+      howBtn.setAttribute('aria-expanded', 'true');
+    }
+  });
+
+  headerRow.append(headerLabel, howBtn);
+  root.appendChild(headerRow);
+  root.appendChild(methodBox);
+
+  // ── Infrastructure (point features inside boundary) ──────────────────────
+  if (infrastructure.length > 0) {
+    const groups = [];
+    const bySlug = {};
+    for (const item of infrastructure) {
+      if (!bySlug[item.slug]) {
+        bySlug[item.slug] = { layer_name: item.layer_name, items: [] };
+        groups.push(item.slug);
+      }
+      bySlug[item.slug].items.push(item);
+    }
+
+    for (const slug of groups) {
+      const { layer_name, items } = bySlug[slug];
+
+      const groupDiv = document.createElement('div');
+      groupDiv.style.cssText = 'margin-bottom:7px';
+
+      const groupHeader = document.createElement('div');
+      groupHeader.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:3px';
+
+      const groupLabel = document.createElement('div');
+      groupLabel.style.cssText = 'font-family:var(--font-label);font-size:9px;color:var(--text-secondary);font-weight:700;flex:1;min-width:0';
+      groupLabel.textContent = `${layer_name} (${items.length})`;
+
+      groupHeader.append(groupLabel, _buildLayerToggleBtn(slug));
+      groupDiv.appendChild(groupHeader);
+
+      const ul = document.createElement('ul');
+      ul.style.cssText = 'margin:0 0 0 12px;padding:0;font-size:10px;color:var(--text-secondary);list-style:disc';
+
+      for (const item of items) {
+        const li = document.createElement('li');
+        li.style.cssText = 'margin-bottom:2px';
+        li.textContent = item.name;
+        if (item.category) {
+          const catSpan = document.createElement('span');
+          catSpan.style.cssText = 'color:var(--text-muted);font-size:9px';
+          catSpan.textContent = ` \u2013 ${item.category}`;
+          li.appendChild(catSpan);
+        }
+        ul.appendChild(li);
+      }
+
+      groupDiv.appendChild(ul);
+      root.appendChild(groupDiv);
+    }
+  }
+
+  // ── Choropleth stats (area-weighted averages) ─────────────────────────────
+  if (stats.length > 0) {
+    if (infrastructure.length > 0) {
+      const hr = document.createElement('div');
+      hr.style.cssText = 'height:1px;background:var(--border);margin:2px 0 7px';
+      root.appendChild(hr);
+    }
+
+    const statsLabel = document.createElement('div');
+    statsLabel.style.cssText = 'font-family:var(--font-label);font-size:9px;color:var(--text-secondary);font-weight:700;margin-bottom:5px';
+    statsLabel.textContent = 'Neighborhood Indicators';
+    root.appendChild(statsLabel);
+
+    for (const stat of stats) {
+      const choropleth = CHOROPLETH[stat.slug];
+      const labelCfg   = CHOROPLETH_LABEL[stat.slug];
+      if (!choropleth || !labelCfg) continue;
+
+      const color       = choroplethColor(stat.value, choropleth.stops, choropleth.stopType);
+      const formatted   = labelCfg.format(stat.value);
+      const coveragePct = Math.round(stat.coverage * 100);
+
+      const statRow = document.createElement('div');
+      statRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:6px';
+
+      const swatch = document.createElement('div');
+      swatch.style.cssText = `width:10px;height:10px;border-radius:2px;background:${color};flex-shrink:0;border:1px solid rgba(0,0,0,0.15)`;
+
+      const textCol = document.createElement('div');
+      textCol.style.cssText = 'flex:1;min-width:0';
+
+      const valueLine = document.createElement('div');
+      valueLine.style.cssText = 'display:flex;align-items:baseline;flex-wrap:wrap;gap:3px';
+
+      const lblSpan = document.createElement('span');
+      lblSpan.style.cssText = 'font-size:10px;color:var(--text-muted)';
+      lblSpan.textContent = labelCfg.label;
+
+      const valSpan = document.createElement('span');
+      valSpan.style.cssText = 'font-size:11px;font-weight:600;color:var(--text-primary)';
+      valSpan.textContent = formatted;
+
+      valueLine.append(lblSpan, valSpan);
+
+      if (coveragePct < 95) {
+        const covSpan = document.createElement('span');
+        covSpan.style.cssText = 'font-size:9px;color:var(--text-muted);white-space:nowrap;margin-left:2px';
+        covSpan.textContent = `${coveragePct}% covered`;
+        valueLine.appendChild(covSpan);
+      }
+
+      textCol.appendChild(valueLine);
+
+      const toggleBtn = _buildLayerToggleBtn(stat.slug);
+      toggleBtn.style.marginLeft = '2px';
+
+      statRow.append(swatch, textCol, toggleBtn);
+      root.appendChild(statRow);
+    }
+  }
+
+  // ── Population profile ────────────────────────────────────────────────────
+  root.appendChild(_buildDemographicsSection(demographics));
+
+  return root;
+}
+
+// Renders the demographics block returned by /neighborhood-context.
+// demographics = { population?: {...}, economics?: {...} }
+function _buildDemographicsSection(demographics) {
+  const frag = document.createDocumentFragment();
+  const { population, economics } = demographics;
+
+  if (!population && !economics) return frag;
+
+  const hr = document.createElement('div');
+  hr.style.cssText = 'height:1px;background:var(--border);margin:4px 0 8px';
+  frag.appendChild(hr);
+
+  // ── Population Profile (from SVI) ─────────────────────────────────────
+  if (population && population.est_total > 0) {
+    const tot = population.est_total;
+    const pct = n => tot > 0 ? Math.round(n / tot * 100) : null;
+    const fmt = n => n != null ? n.toLocaleString() : '—';
+    const fmtPct = n => n != null ? `${n}%` : '—';
+
+    // Section header row
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px';
+
+    const hdrLeft = document.createElement('div');
+    hdrLeft.style.cssText = 'display:flex;align-items:baseline;gap:5px';
+
+    const hdrTitle = document.createElement('span');
+    hdrTitle.style.cssText = 'font-family:var(--font-label);font-size:9px;color:var(--text-secondary);font-weight:700;text-transform:uppercase;letter-spacing:0.08em';
+    hdrTitle.textContent = 'Population Profile';
+
+    const hdrNote = document.createElement('span');
+    hdrNote.style.cssText = 'font-family:var(--font-label);font-size:8px;color:var(--text-muted)';
+    hdrNote.textContent = `SVI ${population.source_year}`;
+
+    if (population.coverage < 0.95) {
+      const covNote = document.createElement('span');
+      covNote.style.cssText = 'font-family:var(--font-label);font-size:8px;color:var(--text-muted)';
+      covNote.textContent = ` \u00b7 ${Math.round(population.coverage * 100)}% covered`;
+      hdrLeft.append(hdrTitle, hdrNote, covNote);
+    } else {
+      hdrLeft.append(hdrTitle, hdrNote);
+    }
+
+    hdr.append(hdrLeft, _buildLayerToggleBtn('svi'));
+    frag.appendChild(hdr);
+
+    // Population estimate hero row
+    const heroRow = document.createElement('div');
+    heroRow.style.cssText = [
+      'display:flex;align-items:center;justify-content:space-between',
+      'background:rgba(255,255,255,0.04);border-radius:4px',
+      'padding:6px 8px;margin-bottom:5px',
+    ].join(';');
+
+    const heroLbl = document.createElement('span');
+    heroLbl.style.cssText = 'font-size:10px;color:var(--text-muted)';
+    heroLbl.textContent = 'Est. residents';
+
+    const heroVal = document.createElement('span');
+    heroVal.style.cssText = 'font-size:13px;font-weight:700;color:var(--text-primary);letter-spacing:-0.01em';
+    heroVal.textContent = `~${tot.toLocaleString()}`;
+
+    heroRow.append(heroLbl, heroVal);
+    frag.appendChild(heroRow);
+
+    // Data rows grid
+    const popRows = [
+      { label: 'People of color',    count: population.est_minority,      pctVal: pct(population.est_minority) },
+      { label: 'Under 17',           count: population.est_under17,        pctVal: pct(population.est_under17) },
+      { label: '65 and older',       count: population.est_65plus,         pctVal: pct(population.est_65plus) },
+      { label: 'With a disability',  count: population.est_disability,     pctVal: pct(population.est_disability) },
+      { label: 'Below 150% poverty', count: population.est_poverty,        pctVal: pct(population.est_poverty) },
+      { label: 'No HS diploma',      count: population.est_no_hs_diploma,  pctVal: pct(population.est_no_hs_diploma) },
+      { label: 'Unemployed',         count: population.est_unemployed,     pctVal: pct(population.est_unemployed) },
+      { label: 'Single-parent HH',   count: population.est_single_parent,  pctVal: pct(population.est_single_parent) },
+      { label: 'No vehicle (HH)',    count: population.est_no_vehicle_hh,  pctVal: null, countSuffix: ' HH' },
+    ];
+
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:1fr auto auto;gap:2px 6px;font-size:10px;margin-bottom:7px;align-items:baseline';
+
+    for (const row of popRows) {
+      if (row.count == null || row.count <= 0) continue;
+
+      const lbl = document.createElement('span');
+      lbl.style.cssText = 'color:var(--text-muted);font-size:9px;padding-right:2px';
+      lbl.textContent = row.label;
+
+      const valPct = document.createElement('span');
+      valPct.style.cssText = 'color:var(--text-primary);font-weight:600;text-align:right';
+      valPct.textContent = row.pctVal != null ? fmtPct(row.pctVal) : '—';
+
+      const valCount = document.createElement('span');
+      valCount.style.cssText = 'color:var(--text-muted);font-size:9px;text-align:right;white-space:nowrap';
+      valCount.textContent = fmt(row.count) + (row.countSuffix || '');
+
+      grid.append(lbl, valPct, valCount);
+    }
+
+    frag.appendChild(grid);
+  }
+
+  // ── Economic Snapshot (from Eviction Lab) ────────────────────────────────
+  if (economics) {
+    const econHdr = document.createElement('div');
+    econHdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px';
+
+    const econHdrLeft = document.createElement('div');
+    econHdrLeft.style.cssText = 'display:flex;align-items:baseline;gap:5px';
+
+    const econTitle = document.createElement('span');
+    econTitle.style.cssText = 'font-family:var(--font-label);font-size:9px;color:var(--text-secondary);font-weight:700;text-transform:uppercase;letter-spacing:0.08em';
+    econTitle.textContent = 'Economic Snapshot';
+
+    const econNote = document.createElement('span');
+    econNote.style.cssText = 'font-family:var(--font-label);font-size:8px;color:var(--text-muted)';
+    econNote.textContent = `Eviction Lab ${economics.source_year}`;
+
+    econHdrLeft.append(econTitle, econNote);
+    if (economics.coverage < 0.95) {
+      const covNote2 = document.createElement('span');
+      covNote2.style.cssText = 'font-family:var(--font-label);font-size:8px;color:var(--text-muted)';
+      covNote2.textContent = ` \u00b7 ${Math.round(economics.coverage * 100)}% covered`;
+      econHdrLeft.appendChild(covNote2);
+    }
+
+    econHdr.append(econHdrLeft, _buildLayerToggleBtn('eviction-lab'));
+    frag.appendChild(econHdr);
+
+    const fmtUSD = n => n != null ? `$${Math.round(n).toLocaleString()}` : '—';
+    const fmtPctF = n => n != null ? `${Math.round(n * 100)}%` : '—';
+
+    const econRows = [
+      { label: 'Median household income', value: economics.median_household_income != null ? fmtUSD(economics.median_household_income) + '/yr' : '—' },
+      { label: 'Median gross rent',        value: economics.median_gross_rent != null ? fmtUSD(economics.median_gross_rent) + '/mo' : '—' },
+      { label: 'Renter-occupied',          value: fmtPctF(economics.pct_renter) },
+      { label: 'Poverty rate',             value: fmtPctF(economics.pct_poverty) },
+      { label: 'Rent-burdened (>30%)',     value: fmtPctF(economics.rent_burden) },
+    ];
+
+    const econGrid = document.createElement('div');
+    econGrid.style.cssText = 'display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:10px;margin-bottom:4px;align-items:baseline';
+
+    for (const row of econRows) {
+      const lbl = document.createElement('span');
+      lbl.style.cssText = 'color:var(--text-muted);font-size:9px;padding-right:2px';
+      lbl.textContent = row.label;
+
+      const val = document.createElement('span');
+      val.style.cssText = 'color:var(--text-primary);font-weight:600;text-align:right;white-space:nowrap';
+      val.textContent = row.value;
+
+      econGrid.append(lbl, val);
+    }
+
+    frag.appendChild(econGrid);
+  }
+
+  return frag;
+}
+
+// Build a small "Show layer" / "Hide layer" button that toggles a map layer.
+function _buildLayerToggleBtn(slug) {
+  const btn = document.createElement('button');
+  btn.style.cssText = [
+    'flex-shrink:0;padding:1px 6px',
+    'font-family:var(--font-label);font-size:8px;letter-spacing:0.05em',
+    'border-radius:3px;cursor:pointer;transition:background 0.1s,color 0.1s',
+    'border:1px solid var(--border)',
+  ].join(';');
+
+  function refresh() {
+    const on = layerState[slug];
+    btn.textContent = on ? 'HIDE LAYER' : 'SHOW LAYER';
+    btn.style.background = on ? 'rgba(33,150,165,0.18)' : 'none';
+    btn.style.color       = on ? '#2196A5' : 'var(--text-muted)';
+    btn.style.borderColor = on ? '#2196A5' : 'var(--border)';
+    btn.setAttribute('aria-pressed', String(Boolean(on)));
+    btn.setAttribute('aria-label', `${on ? 'Hide' : 'Show'} ${slug} layer on map`);
+  }
+
+  refresh();
+
+  btn.addEventListener('click', () => {
+    const meta = _layerMeta[slug];
+    if (!meta) return;
+    if (layerState[slug]) disableLayer(meta);
+    else enableLayer(meta);
+    refresh();
+  });
+
+  return btn;
+}
 
 function showPointPopup(lngLat, layer, props) {
   let headerHtml = '';
