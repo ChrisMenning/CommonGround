@@ -181,7 +181,7 @@ All data sources, their provenance, trust ratings, update schedules, and coverag
 |---|---|---|
 | Community Fridges (Wisconsin) | `free-fridges` | No machine-readable API found. WPR article (2026-03-22) is active research lead — see notes below. Fallback: manual admin-trigger entry form. |
 | Mutual Aid Hub | `mutual-aid-hub` | Unclear if MutualAidHub has a public API or bulk export. Coverage will be uneven; trust ceiling 2/5. |
-| Green Bay Municipal Permits | `gb-permits` | Depends on Phase 2 admin interface (see DECISION-LOG 2026-03-22). Check GB open data portal for building/assembly permit feed. Shared source for T2-H01 and T3-S01. |
+| Green Bay Municipal Permits | `gb-permits` | Seed script implemented. Endpoint not yet configured — `data.greenbaywi.gov` is credential-gated; operator must supply ArcGIS token or Open Records file. Layer record auto-inserted on first ingest run. See seed script header for options A/B/C. |
 | Wisconsin CCAP (eviction court records) | `ccap` | Legal review required — court record access, re-identification risk |
 | DeFlock (ALPR surveillance locations) | `defloc-alpr` | Data availability and terms review |
 | HMDA (mortgage lending) | `hmda` | Ingest design |
@@ -198,6 +198,26 @@ All data sources, their provenance, trust ratings, update schedules, and coverag
 - **Trust ceiling:** Community-sourced or organization-reported data. Maximum 3/5; actual rating depends on update cadence of whichever source lands.
 - **Claim type:** `DOCUMENTED` (locations are real infrastructure; status self-reported).
 - **Ingest stub:** `ingest/seeds/free-fridges.js` (not yet implemented). Signals blocked: T1-F01 (fully), T2-F01 (partial extension).
+
+---
+
+### City of Green Bay Building Permits
+| Field | Value |
+|---|---|
+| Slug | `gb-permits` |
+| Provider | City of Green Bay — Community & Economic Development (CED) |
+| URL | https://www.greenbaywi.gov/312/Building-Permits-Inspections |
+| Trust | 4/5 (when configured) |
+| Claim type | `DOCUMENTED` |
+| Aggregation | Point |
+| Update frequency | Daily (when configured) |
+| Brown County coverage | City of Green Bay only |
+| License | Public record (Wis. Stats. § 19.35 open records) |
+| Ingest script | `ingest/seeds/gb-permits.js` |
+| Manual download | No (API) — but endpoint requires operator configuration |
+| Signal uses | T2-H01 (renovation pressure trend), T3-S01 (assembly event briefings) |
+| Notes | `data.greenbaywi.gov` (ArcGIS Hub) requires organizational login — no public API as of 2026-03-22. Seed script implements three path options: (A) ArcGIS token from a GB org account, (B) Open Records GeoJSON/CSV file, (C) API partnership. Layer record is created automatically on first ingest run; it remains `active=false` until an endpoint is configured and verified. |
+| **Current status** | **BLOCKED — endpoint not configured.** To unblock: obtain a Green Bay ArcGIS token or lodge a § 19.35 Open Records request with CED (920-448-3300). Configure endpoint in admin `source_configs` for slug `gb-permits`, municipality `green-bay`. |
 
 ---
 

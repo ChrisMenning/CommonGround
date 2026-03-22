@@ -58,6 +58,7 @@ const SIDEBAR_ICON = {
   // Community
   'osm-resources':          'community_centre',
   'neighborhood-assoc':     'social_facility',
+  'gb-permits':             'community_centre',
 };
 
 // Render a Phosphor SVG as a 14×14 img element colored with `color`.
@@ -110,8 +111,9 @@ const GROUPS_BY_SOURCE = {
   'OpenStreetMap': [
     'osm-resources',
   ],
-  'Neighborhood Associations': [
+  'City of Green Bay': [
     'neighborhood-assoc',
+    'gb-permits',
   ],
 };
 
@@ -139,7 +141,7 @@ const GROUPS_BY_TYPE = {
     'fqhc',
   ],
   'Community Infrastructure': [
-    'osm-resources','neighborhood-assoc',
+    'osm-resources','neighborhood-assoc','gb-permits',
   ],
 };
 
