@@ -76,10 +76,13 @@ function renderAlertSidebar(alerts) {
     const isVisible = _alertVisible.get(alert.id) !== false; // default true
     const item = document.createElement('div');
     item.className = `alert-item alert-severity-${alert.severity}${isVisible ? ' map-visible' : ''}`;
+    item.setAttribute('role', 'button');
+    item.setAttribute('tabindex', '0');
+    item.setAttribute('aria-label', `${SEVERITY_LABEL[alert.severity] || ''}: ${alert.title}. Click to view details.`);
     item.innerHTML = `
       <div class="alert-header">
         <div class="alert-title">${escHtml(alert.title)}</div>
-        <div class="alert-map-toggle" title="Toggle map visibility"></div>
+        <div class="alert-map-toggle" role="switch" aria-checked="${isVisible}" aria-label="Show on map" tabindex="0" title="Toggle map visibility"></div>
       </div>
       <div class="alert-meta">
         <span class="claim-badge claim-${escHtml(alert.claim_type)}">${escHtml(alert.claim_type)}</span>
@@ -87,11 +90,22 @@ function renderAlertSidebar(alerts) {
       </div>`;
 
     // Toggle stops propagation so it doesn't open the detail drawer
-    item.querySelector('.alert-map-toggle').addEventListener('click', (e) => {
+    const toggleEl = item.querySelector('.alert-map-toggle');
+    const onToggle = (e) => {
       e.stopPropagation();
+      const nowVisible = !(_alertVisible.get(alert.id) !== false);
+      toggleEl.setAttribute('aria-checked', String(nowVisible));
       toggleAlertMap(alert, item);
+    };
+    toggleEl.addEventListener('click', onToggle);
+    toggleEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(e); }
     });
+
     item.addEventListener('click', () => showAlertDetail(alert));
+    item.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); showAlertDetail(alert); }
+    });
     list.appendChild(item);
   });
 }
@@ -127,6 +141,9 @@ function renderAlertMarkers(alerts) {
     if (geom.type === 'Point') {
       const [lng, lat] = geom.coordinates;
       const el = document.createElement('div');
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
+      el.setAttribute('aria-label', `Alert: ${alert.title}. Click for details.`);
       el.style.cssText = `
         width: 14px; height: 14px;
         border-radius: 50%;
@@ -136,6 +153,9 @@ function renderAlertMarkers(alerts) {
         box-shadow: 0 0 6px rgba(0,0,0,0.5);
       `;
       el.addEventListener('click', () => showAlertDetail(alert));
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showAlertDetail(alert); }
+      });
       if (_alertVisible.get(alert.id) === false) el.style.display = 'none';
 
       const marker = new maplibregl.Marker({ element: el })

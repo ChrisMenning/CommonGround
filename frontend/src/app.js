@@ -90,6 +90,7 @@ if (resourceToggle && resourceForm) {
   resourceToggle.addEventListener('click', () => {
     const hidden = resourceForm.classList.toggle('hidden');
     resourceToggle.textContent = hidden ? '+ Submit Resource' : '− Submit Resource';
+    resourceToggle.setAttribute('aria-expanded', String(!hidden));
     if (resourceMsg) resourceMsg.textContent = '';
   });
 

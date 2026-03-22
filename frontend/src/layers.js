@@ -415,6 +415,7 @@ function buildLayerItem(layer) {
 
   const trust = document.createElement('span');
   trust.className = 'trust-pip';
+  trust.setAttribute('aria-label', `Trust rating: ${layer.trust_rating || 0} of 5`);
   trust.textContent = '\u2605'.repeat(layer.trust_rating || 0);
 
   const toggle = document.createElement('div');
@@ -429,6 +430,7 @@ function buildLayerItem(layer) {
 
     const opacityLabel = document.createElement('span');
     opacityLabel.textContent = 'OPACITY';
+    opacityLabel.id = `opacity-label-${layer.slug}`;
     opacityLabel.style.cssText = 'font-size:8px;color:var(--text-muted);font-family:var(--font-label);letter-spacing:0.1em;white-space:nowrap';
 
     const slider = document.createElement('input');
@@ -436,6 +438,8 @@ function buildLayerItem(layer) {
     slider.min = '10';
     slider.max = '100';
     slider.value = String(Math.round((_layerOpacity[layer.slug] || 0.75) * 100));
+    slider.setAttribute('aria-label', `Opacity for ${layer.name}`);
+    slider.setAttribute('aria-labelledby', `opacity-label-${layer.slug}`);
     slider.addEventListener('click', e => e.stopPropagation());
     slider.addEventListener('input', e => {
       const opacity = parseInt(e.target.value) / 100;
@@ -453,6 +457,19 @@ function buildLayerItem(layer) {
   item.addEventListener('click', () => {
     if (layerState[layer.slug]) disableLayer(layer);
     else enableLayer(layer);
+  });
+
+  // Keyboard accessibility: Enter or Space activates the toggle
+  item.setAttribute('role', 'button');
+  item.setAttribute('tabindex', '0');
+  item.setAttribute('aria-pressed', layerState[layer.slug] ? 'true' : 'false');
+  item.setAttribute('aria-label', layer.name);
+  item.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (layerState[layer.slug]) disableLayer(layer);
+      else enableLayer(layer);
+    }
   });
 
   return item;
@@ -712,6 +729,9 @@ let _drawerCloseCallback = null;
 function initDrawer(map) {
   _drawerEl = document.createElement('div');
   _drawerEl.id = 'info-drawer';
+  _drawerEl.setAttribute('role', 'dialog');
+  _drawerEl.setAttribute('aria-labelledby', 'info-drawer-title');
+  _drawerEl.setAttribute('aria-modal', 'false');
   _drawerEl.style.cssText = [
     'position:absolute;top:0;right:0;width:300px;height:100%',
     'background:var(--bark);border-left:2px solid var(--border)',
@@ -729,7 +749,9 @@ function initDrawer(map) {
   drawerHeader.innerHTML = '<span id="info-drawer-title">Layer Data</span>';
 
   const closeBtn = document.createElement('button');
-  closeBtn.textContent = 'âœ•';
+  closeBtn.id = 'info-drawer-close';
+  closeBtn.setAttribute('aria-label', 'Close data panel');
+  closeBtn.textContent = '\u2715';
   closeBtn.style.cssText = 'background:none;border:none;color:var(--text-muted);cursor:pointer;font-family:var(--font-label);font-size:11px;padding:2px 4px;line-height:1;transition:color 0.1s';
   closeBtn.addEventListener('click', closeDrawer);
   drawerHeader.appendChild(closeBtn);
@@ -1041,6 +1063,7 @@ function updateToggleUI(slug, active) {
   const item = document.querySelector(`.layer-item[data-slug="${slug}"]`);
   if (!item) return;
   item.classList.toggle('active', active);
+  item.setAttribute('aria-pressed', String(active));
   // opacity row visibility is handled by CSS (.layer-item.active .layer-opacity-row)
 }
 
@@ -1069,6 +1092,9 @@ export function openDrawerWithContent(title, bodyEl, onClose) {
     body.innerHTML = String(bodyEl);
   }
   _drawerEl.style.transform = 'translateX(0)';
+  // Move focus to close button when drawer opens
+  const closeBtn = document.getElementById('info-drawer-close');
+  if (closeBtn) setTimeout(() => closeBtn.focus(), 50);
 }
 
 export async function refreshActiveLayers() {

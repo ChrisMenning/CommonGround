@@ -15,6 +15,7 @@ let _resourcesFilter = 'pending'; // 'pending' | 'approved'
 
 // Cached modal context for save handler
 let _modalCtx = null;
+let _modalTriggerEl = null; // element that opened the current modal (for focus return)
 
 // Cached data — populated on load, reused by edit handlers
 let _sourcesCache = [];
@@ -64,15 +65,25 @@ function toast(message, isError = false) {
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
 function openModal(title, bodyHtml, onSave) {
+  _modalTriggerEl = document.activeElement;
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').innerHTML = bodyHtml;
   _modalCtx = { onSave };
-  document.getElementById('edit-modal').showModal();
+  const dialog = document.getElementById('edit-modal');
+  dialog.showModal();
+  // Focus first focusable element in the modal body
+  const first = dialog.querySelector('input,select,textarea,button:not([disabled])');
+  if (first) first.focus();
 }
 
 function closeModal() {
   document.getElementById('edit-modal').close();
   _modalCtx = null;
+  // Return focus to the element that triggered the modal
+  if (_modalTriggerEl && typeof _modalTriggerEl.focus === 'function') {
+    _modalTriggerEl.focus();
+  }
+  _modalTriggerEl = null;
 }
 
 // ── Auth / login ──────────────────────────────────────────────────────────────
@@ -85,6 +96,9 @@ function showLogin() {
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
+  // Move focus to first tab button
+  const firstTab = document.querySelector('.tab-btn');
+  if (firstTab) firstTab.focus();
 }
 
 document.getElementById('login-form').addEventListener('submit', async (e) => {
@@ -132,9 +146,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.tab;
     if (tab === _activeTab) return;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    });
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
     document.getElementById(`tab-${tab}`).classList.add('active');
     _activeTab = tab;
     loadTab(tab);
@@ -197,7 +215,7 @@ function renderSourcesTable(sources) {
           <th>ENDPOINT URL</th>
           <th>FORMAT</th>
           <th>NOTE</th>
-          <th></th>
+          <th scope="col">Actions</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -231,24 +249,24 @@ async function editSource(id) {
   openModal('EDIT DATA SOURCE', `
     <div class="form-row">
       <div class="form-group">
-        <label>SLUG</label>
+        <label for="m-slug">SLUG</label>
         <input type="text" id="m-slug" value="${escHtml(src.slug)}" readonly
                style="opacity:0.6;cursor:default">
       </div>
       <div class="form-group">
-        <label>MUNICIPALITY <span class="text-muted">(blank = all)</span></label>
+        <label for="m-municipality">MUNICIPALITY <span class="text-muted">(blank = all)</span></label>
         <input type="text" id="m-municipality" value="${escHtml(src.municipality || '')}"
                placeholder="e.g. green-bay">
       </div>
     </div>
     <div class="form-group">
-      <label>ENDPOINT URL <span class="text-muted">(leave blank to use seed-script default)</span></label>
+      <label for="m-endpoint-url">ENDPOINT URL <span class="text-muted">(leave blank to use seed-script default)</span></label>
       <input type="url" id="m-endpoint-url" value="${escHtml(src.endpoint_url || '')}"
              placeholder="https://…">
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label>FORMAT</label>
+        <label for="m-format">FORMAT</label>
         <select id="m-format">
           ${['json','csv','geojson','xlsx','arcgis-rest'].map(f =>
             `<option value="${f}" ${src.endpoint_format === f ? 'selected' : ''}>${f}</option>`
@@ -256,7 +274,7 @@ async function editSource(id) {
         </select>
       </div>
       <div class="form-group">
-        <label>STATUS</label>
+        <label for="m-status">STATUS</label>
         <select id="m-status">
           ${['active','degraded','blocked','pending'].map(s =>
             `<option value="${s}" ${src.status === s ? 'selected' : ''}>${s}</option>`
@@ -265,7 +283,7 @@ async function editSource(id) {
       </div>
     </div>
     <div class="form-group">
-      <label>STATUS NOTE</label>
+      <label for="m-status-note">STATUS NOTE</label>
       <textarea id="m-status-note">${escHtml(src.status_note || '')}</textarea>
     </div>
     <div class="checkbox-row">
@@ -273,13 +291,13 @@ async function editSource(id) {
       <label for="m-enabled">ENABLED (ingest will run when checked)</label>
     </div>
     <div class="form-group">
-      <label>EXTRA CONFIG JSON <span class="text-muted">(advanced — must be valid JSON)</span></label>
+      <label for="m-config-json">EXTRA CONFIG JSON <span class="text-muted">(advanced — must be valid JSON)</span></label>
       <textarea id="m-config-json" style="font-family:monospace;font-size:11px">${escHtml(
         JSON.stringify(src.config_json || {}, null, 2)
       )}</textarea>
     </div>
     <div class="form-group">
-      <label>API KEY
+      <label for="m-api-key">API KEY
         <span class="text-muted" style="font-size:10px;margin-left:4px">${src.api_key_set ? '● currently set' : 'not set'}</span>
       </label>
       <input type="password" id="m-api-key"
@@ -326,21 +344,21 @@ document.getElementById('add-source-btn').addEventListener('click', () => {
   openModal('NEW DATA SOURCE', `
     <div class="form-row">
       <div class="form-group">
-        <label>SLUG <span class="text-muted">(lowercase, hyphens only)</span></label>
+        <label for="m-slug">SLUG <span class="text-muted">(lowercase, hyphens only)</span></label>
         <input type="text" id="m-slug" placeholder="e.g. gb-permits">
       </div>
       <div class="form-group">
-        <label>MUNICIPALITY <span class="text-muted">(blank = all)</span></label>
+        <label for="m-municipality">MUNICIPALITY <span class="text-muted">(blank = all)</span></label>
         <input type="text" id="m-municipality" placeholder="e.g. green-bay">
       </div>
     </div>
     <div class="form-group">
-      <label>ENDPOINT URL <span class="text-muted">(leave blank to use seed-script default)</span></label>
+      <label for="m-endpoint-url">ENDPOINT URL <span class="text-muted">(leave blank to use seed-script default)</span></label>
       <input type="url" id="m-endpoint-url" placeholder="https://…">
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label>FORMAT</label>
+        <label for="m-format">FORMAT</label>
         <select id="m-format">
           ${['json','csv','geojson','xlsx','arcgis-rest'].map(f =>
             `<option value="${f}">${f}</option>`
@@ -348,7 +366,7 @@ document.getElementById('add-source-btn').addEventListener('click', () => {
         </select>
       </div>
       <div class="form-group">
-        <label>STATUS</label>
+        <label for="m-status">STATUS</label>
         <select id="m-status">
           <option value="active">active</option>
           <option value="pending" selected>pending</option>
@@ -358,7 +376,7 @@ document.getElementById('add-source-btn').addEventListener('click', () => {
       </div>
     </div>
     <div class="form-group">
-      <label>STATUS NOTE</label>
+      <label for="m-status-note">STATUS NOTE</label>
       <textarea id="m-status-note" placeholder="What's the status? Why is it blocked / degraded?"></textarea>
     </div>
     <div class="checkbox-row">
@@ -366,11 +384,11 @@ document.getElementById('add-source-btn').addEventListener('click', () => {
       <label for="m-enabled">ENABLED (ingest will run when checked)</label>
     </div>
     <div class="form-group">
-      <label>EXTRA CONFIG JSON <span class="text-muted">(advanced)</span></label>
+      <label for="m-config-json">EXTRA CONFIG JSON <span class="text-muted">(advanced)</span></label>
       <textarea id="m-config-json" style="font-family:monospace;font-size:11px">{}</textarea>
     </div>
     <div class="form-group">
-      <label>API KEY <span class="text-muted">(optional)</span></label>
+      <label for="m-api-key">API KEY <span class="text-muted">(optional)</span></label>
       <input type="password" id="m-api-key" placeholder="Enter API key…" autocomplete="off">
       <div class="text-muted" style="font-size:10px;margin-top:2px">Leave blank if this source does not require an API key.</div>
     </div>
@@ -445,7 +463,7 @@ function renderLayersTable(layers) {
           <th>STATUS</th>
           <th>VINTAGE</th>
           <th>COLOR</th>
-          <th></th>
+          <th scope="col">Actions</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -475,20 +493,20 @@ async function editLayer(slug) {
 
   openModal(`EDIT LAYER — ${slug}`, `
     <div class="form-group">
-      <label>NAME</label>
+      <label for="m-name">NAME</label>
       <input type="text" id="m-name" value="${escHtml(layer.name)}">
     </div>
     <div class="form-group">
-      <label>SOURCE LABEL</label>
+      <label for="m-source">SOURCE LABEL</label>
       <input type="text" id="m-source" value="${escHtml(layer.source || '')}">
     </div>
     <div class="form-group">
-      <label>SOURCE URL</label>
+      <label for="m-source-url">SOURCE URL</label>
       <input type="url" id="m-source-url" value="${escHtml(layer.source_url || '')}" placeholder="https://…">
     </div>
     <div class="form-row-3">
       <div class="form-group">
-        <label>TRUST RATING (1–5)</label>
+        <label for="m-trust">TRUST RATING (1–5)</label>
         <select id="m-trust">
           ${[1,2,3,4,5].map(n =>
             `<option value="${n}" ${layer.trust_rating === n ? 'selected' : ''}>${n}</option>`
@@ -496,7 +514,7 @@ async function editLayer(slug) {
         </select>
       </div>
       <div class="form-group">
-        <label>CLAIM TYPE</label>
+        <label for="m-claim">CLAIM TYPE</label>
         <select id="m-claim">
           ${['DOCUMENTED','CORRELATION','MECHANISM'].map(c =>
             `<option value="${c}" ${layer.claim_type === c ? 'selected' : ''}>${c}</option>`
@@ -504,25 +522,25 @@ async function editLayer(slug) {
         </select>
       </div>
       <div class="form-group">
-        <label>COLOR (#RRGGBB)</label>
+        <label for="m-color">COLOR (#RRGGBB)</label>
         <input type="text" id="m-color" value="${escHtml(layer.color || '#7FA843')}"
                placeholder="#7FA843" style="font-family:monospace">
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label>UPDATE FREQUENCY</label>
+        <label for="m-frequency">UPDATE FREQUENCY</label>
         <input type="text" id="m-frequency" value="${escHtml(layer.update_frequency || '')}"
                placeholder="e.g. annual, monthly">
       </div>
       <div class="form-group">
-        <label>DATA VINTAGE</label>
+        <label for="m-vintage">DATA VINTAGE</label>
         <input type="text" id="m-vintage" value="${escHtml(layer.data_vintage || '')}"
                placeholder="e.g. 2022">
       </div>
     </div>
     <div class="form-group">
-      <label>DESCRIPTION</label>
+      <label for="m-description">DESCRIPTION</label>
       <textarea id="m-description">${escHtml(layer.description || '')}</textarea>
     </div>
     <div class="checkbox-row">
@@ -625,7 +643,7 @@ function renderResourcesTable(resources) {
           <th>ADDRESS</th>
           <th>DESCRIPTION</th>
           <th>SUBMITTED</th>
-          <th></th>
+          <th scope="col">Actions</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>

@@ -19,13 +19,41 @@
       --teal:           #2196A5;
       --text-primary:   #E8D5A3;
       --text-secondary: #B8A070;
-      --text-muted:     #7A6040;
+      --text-muted:     #B09070;
       --border:         #4A3520;
       --danger:         #C0392B;
       --danger-dim:     #8B2520;
       --font-label:     'Courier New', 'Courier', monospace;
       --font-body:      Georgia, 'Times New Roman', serif;
     }
+
+    /* ── Accessibility utilities ── */
+    .sr-only {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .skip-link {
+      position: absolute;
+      top: -100%;
+      left: 0;
+      background: var(--sprout);
+      color: var(--soil);
+      font-family: var(--font-label);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      padding: 8px 14px;
+      z-index: 9999;
+      text-decoration: none;
+      text-transform: uppercase;
+    }
+
+    .skip-link:focus { top: 0; }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -186,6 +214,11 @@
     select:focus,
     textarea:focus {
       border-color: var(--sprout);
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--sprout);
+      outline-offset: 2px;
     }
 
     textarea { resize: vertical; min-height: 80px; }
@@ -416,6 +449,7 @@
   </style>
 </head>
 <body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
 
 <!-- ── Login screen ─────────────────────────────────────────────────────────── -->
 <div id="login-screen">
@@ -428,7 +462,7 @@
         <input type="password" id="token-input" autocomplete="current-password"
                placeholder="Enter admin token" autofocus required>
       </div>
-      <div id="login-error" class="info-box error" style="display:none;margin-bottom:12px"></div>
+      <div id="login-error" role="alert" class="info-box error" style="display:none;margin-bottom:12px"></div>
       <button type="submit" class="btn btn-primary" style="width:100%">SIGN IN</button>
     </form>
   </div>
@@ -441,19 +475,19 @@
     <button id="logout-btn" class="btn btn-sm">SIGN OUT</button>
   </header>
 
-  <nav id="tab-nav">
-    <button class="tab-btn active" data-tab="sources">DATA SOURCES</button>
-    <button class="tab-btn" data-tab="layers">LAYERS</button>
-    <button class="tab-btn" data-tab="resources">
+  <nav id="tab-nav" role="tablist" aria-label="Admin sections">
+    <button id="tab-btn-sources" class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-sources" data-tab="sources">DATA SOURCES</button>
+    <button id="tab-btn-layers" class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-layers" data-tab="layers">LAYERS</button>
+    <button id="tab-btn-resources" class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-resources" data-tab="resources">
       PENDING RESOURCES <span id="resources-count" class="badge-count" style="display:none"></span>
     </button>
-    <button class="tab-btn" data-tab="signal-runs">SIGNAL RUNS</button>
+    <button id="tab-btn-signal-runs" class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-signal-runs" data-tab="signal-runs">SIGNAL RUNS</button>
   </nav>
 
   <main id="main-content">
 
     <!-- ── Sources tab ── -->
-    <section id="tab-sources" class="tab-panel active">
+    <section id="tab-sources" class="tab-panel active" role="tabpanel" aria-labelledby="tab-btn-sources" tabindex="0">
       <div class="tab-header">
         <h2>DATA SOURCE CONFIGURATION</h2>
         <button id="add-source-btn" class="btn btn-primary btn-sm">+ NEW SOURCE</button>
@@ -471,7 +505,7 @@
     </section>
 
     <!-- ── Layers tab ── -->
-    <section id="tab-layers" class="tab-panel">
+    <section id="tab-layers" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-layers" tabindex="0">
       <div class="tab-header">
         <h2>MAP LAYERS</h2>
       </div>
@@ -485,7 +519,7 @@
     </section>
 
     <!-- ── Resources tab ── -->
-    <section id="tab-resources" class="tab-panel">
+    <section id="tab-resources" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-resources" tabindex="0">
       <div class="tab-header">
         <h2>PENDING COMMUNITY RESOURCES</h2>
         <div style="display:flex;gap:8px">
@@ -503,14 +537,17 @@
     </section>
 
     <!-- ── Signal runs tab ── -->
-    <section id="tab-signal-runs" class="tab-panel">
+    <section id="tab-signal-runs" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-signal-runs" tabindex="0">
       <div class="tab-header">
         <h2>SIGNAL ENGINE AUDIT LOG</h2>
-        <select id="runs-days-select" class="btn btn-sm" style="width:auto">
-          <option value="1">Last 24 hours</option>
-          <option value="7" selected>Last 7 days</option>
-          <option value="30">Last 30 days</option>
-        </select>
+        <div>
+          <label for="runs-days-select" class="sr-only">Show signal runs for the last</label>
+          <select id="runs-days-select" class="btn btn-sm" style="width:auto">
+            <option value="1">Last 24 hours</option>
+            <option value="7" selected>Last 7 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </div>
       </div>
       <div id="signal-runs-table" class="table-scroll">
         <div class="empty-state">Loading…</div>
@@ -521,7 +558,7 @@
 </div>
 
 <!-- ── Toast container ──────────────────────────────────────────────────────── -->
-<div id="toast-container"></div>
+<div id="toast-container" aria-live="polite" aria-label="Notifications"></div>
 
 <!-- ── Edit modal ───────────────────────────────────────────────────────────── -->
 <dialog id="edit-modal" aria-modal="true" aria-labelledby="modal-title">

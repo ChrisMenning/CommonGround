@@ -147,6 +147,25 @@ Frontend polls GET /alerts?bbox=W,S,E,N every 5 minutes
 
 ---
 
+## Accessibility Standards
+
+All user interfaces — the main map application (`index.html`) and the admin interface (`admin.html`) — must conform to **WCAG 2.2 Level AA** (Web Content Accessibility Guidelines 2.2, W3C Recommendation 5 October 2023).
+
+This is a non-negotiable project requirement. New UI features must be reviewed for accessibility compliance before deployment. Key requirements include:
+
+| Principle | Implementation |
+|---|---|
+| Keyboard accessible | All interactive elements reachable and operable by keyboard alone |
+| Sufficient contrast | Text ≥ 4.5:1, UI components and focus indicators ≥ 3:1 |
+| Programmatic labels | All form controls have associated `<label>` elements |
+| Live regions | Dynamic status updates announced via `aria-live` |
+| Focus management | Modal open/close, panel transitions restore logical focus |
+| Skip navigation | Skip-to-main-content link on every page |
+| Landmarks | `<main>`, `<nav>`, `<aside>` with labels; visible heading hierarchy |
+| Target size | Interactive targets meet 24×24 CSS px minimum (or spacing exception) |
+
+---
+
 ## Phase 2 Additions (next)
 
 **Phase 2B — Signal Engine:**
