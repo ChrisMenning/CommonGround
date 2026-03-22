@@ -9,6 +9,7 @@
  */
 'use strict';
 import { apiFetch, bboxFromMap } from './api-client.js';
+import { enableLayerBySlug, openDrawerWithContent } from './layers.js';
 
 /* global maplibregl */
 
@@ -17,6 +18,22 @@ let _alertMarkers = [];
 let _alertPolygonSources = [];  // track MapLibre source IDs for polygon alerts
 
 const SEVERITY_LABEL = { 1: 'TIER 1 — IMMEDIATE', 2: 'TIER 2 — EMERGING', 3: 'TIER 3 — AWARENESS' };
+
+// Data layers to activate when each alert type is selected
+const ALERT_LAYERS = {
+  'T1-E01':   ['svi-overall'],
+  'T1-H01':   ['eviction-filing-rate'],
+  'T1-F01':   ['food-access', 'snap-retailers'],
+  'T2-H01':   ['eviction-filing-rate', 'chas-cost-burdened'],
+  'T2-F01':   ['food-access', 'snap-retailers'],
+  'T2-C01':   ['svi-overall'],
+  'T2-ENV01': ['ejscreen-ej-score', 'svi-overall'],
+  'T3-S01':   ['fqhc', 'airnow'],
+  'T3-I01':   [],
+  'T3-R01':   ['svi-overall', 'osm-resources'],
+};
+
+let _focusedAlertId = null;
 
 export async function initAlerts(map) {
   _map = map;
@@ -70,14 +87,19 @@ function renderAlertSidebar(alerts) {
 }
 
 function renderAlertMarkers(alerts) {
+  // Reset focus tracking before removing all alert layers
+  _focusedAlertId = null;
+
   // Clear existing point markers
   _alertMarkers.forEach(m => m.remove());
   _alertMarkers = [];
 
-  // Clear existing polygon alert layers
+  // Clear existing polygon alert layers (including any focus rings)
   _alertPolygonSources.forEach(sourceId => {
-    const fillId    = `${sourceId}-fill`;
+    const focusId   = `${sourceId}-focus`;
     const outlineId = `${sourceId}-outline`;
+    const fillId    = `${sourceId}-fill`;
+    if (_map.getLayer(focusId))   _map.removeLayer(focusId);
     if (_map.getLayer(outlineId)) _map.removeLayer(outlineId);
     if (_map.getLayer(fillId))    _map.removeLayer(fillId);
     if (_map.getSource(sourceId)) _map.removeSource(sourceId);
@@ -139,39 +161,139 @@ function renderAlertMarkers(alerts) {
 }
 
 function showAlertDetail(alert) {
-  const sources = (alert.sources || []).map(s => escHtml(s)).join(', ') || 'N/A';
-  const updated = alert.created_at
-    ? new Date(alert.created_at).toLocaleString()
-    : 'Unknown';
+  // Activate the data layers relevant to this alert type
+  (ALERT_LAYERS[alert.alert_type] || []).forEach(slug => enableLayerBySlug(slug));
 
-  const content = `
-    <div class="popup-inner">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
-        <span class="claim-badge claim-${escHtml(alert.claim_type)}">${escHtml(alert.claim_type)}</span>
-        <span style="font-family:var(--font-label);font-size:9px;color:var(--text-muted)">${escHtml(SEVERITY_LABEL[alert.severity] || '')}</span>
-      </div>
-      <div class="popup-title">${escHtml(alert.title)}</div>
-      ${alert.description ? `<p style="font-size:12px;margin:6px 0;color:var(--text-secondary)">${escHtml(alert.description)}</p>` : ''}
-      ${alert.recommendation ? `<p style="font-size:12px;margin:6px 0;color:var(--sprout)"><strong>Action:</strong> ${escHtml(alert.recommendation)}</p>` : ''}
-      <div class="popup-alert-caution">${escHtml(alert.caution)}</div>
-    </div>
-    <div class="popup-footer">
-      <span>Sources: ${sources}</span>
-      <span>Updated: ${escHtml(updated)}</span>
-    </div>`;
+  // Highlight the affected area on the map and fly to it
+  _focusAlert(alert);
 
-  // If we have geometry, show popup at centroid; otherwise center of map
-  let lngLat;
-  if (alert.affected_geometry?.type === 'Point') {
-    lngLat = alert.affected_geometry.coordinates;
-  } else {
-    lngLat = _map.getCenter().toArray();
+  // Open the right-side drawer with alert content
+  openDrawerWithContent('Alert Detail', buildAlertDrawerContent(alert), () => {
+    _unfocusAlert(alert.id);
+  });
+}
+
+function _focusAlert(alert) {
+  if (!_map || !alert.affected_geometry) return;
+  const geom = alert.affected_geometry;
+  if (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon') return;
+
+  // Unfocus a different previously focused alert
+  if (_focusedAlertId !== null && _focusedAlertId !== alert.id) {
+    _unfocusAlert(_focusedAlertId);
+  }
+  _focusedAlertId = alert.id;
+
+  const sourceId  = `cg-alert-${alert.id}`;
+  const outlineId = `${sourceId}-outline`;
+  const focusId   = `${sourceId}-focus`;
+  const color = alert.severity === 1 ? '#C0392B'
+              : alert.severity === 2 ? '#D4A017'
+              : '#5A7A32';
+
+  // Thicken the crisp outline ring
+  if (_map.getLayer(outlineId)) {
+    _map.setPaintProperty(outlineId, 'line-width',   3);
+    _map.setPaintProperty(outlineId, 'line-opacity', 1.0);
   }
 
-  new maplibregl.Popup({ maxWidth: '340px', closeButton: true })
-    .setLngLat(lngLat)
-    .setHTML(content)
-    .addTo(_map);
+  // Add a wide blurred glow ring behind the outline
+  if (!_map.getLayer(focusId) && _map.getSource(sourceId)) {
+    const before = _map.getLayer(outlineId) ? outlineId : undefined;
+    _map.addLayer({
+      id: focusId, type: 'line', source: sourceId,
+      paint: { 'line-color': color, 'line-width': 14, 'line-opacity': 0.28, 'line-blur': 10 },
+    }, before);
+  }
+
+  // Fly to the alert geometry bounds
+  const bounds = _geojsonBounds(geom);
+  if (bounds) _map.fitBounds(bounds, { padding: 70, maxZoom: 14, duration: 600 });
+}
+
+function _unfocusAlert(alertId) {
+  if (!_map) return;
+  const sourceId  = `cg-alert-${alertId}`;
+  const outlineId = `${sourceId}-outline`;
+  const focusId   = `${sourceId}-focus`;
+  if (_map.getLayer(focusId))   _map.removeLayer(focusId);
+  if (_map.getLayer(outlineId)) {
+    _map.setPaintProperty(outlineId, 'line-width',   1.5);
+    _map.setPaintProperty(outlineId, 'line-opacity', 0.75);
+  }
+  if (_focusedAlertId === alertId) _focusedAlertId = null;
+}
+
+function _geojsonBounds(geom) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  function walk(c) {
+    if (typeof c[0] === 'number') {
+      if (c[0] < minX) minX = c[0]; if (c[0] > maxX) maxX = c[0];
+      if (c[1] < minY) minY = c[1]; if (c[1] > maxY) maxY = c[1];
+    } else { c.forEach(walk); }
+  }
+  walk(geom.coordinates);
+  return isFinite(minX) ? [[minX, minY], [maxX, maxY]] : null;
+}
+
+function buildAlertDrawerContent(alert) {
+  const sources = (alert.sources || []).map(s => `<div>${escHtml(s)}</div>`).join('') || 'N/A';
+  const updated  = alert.created_at ? new Date(alert.created_at).toLocaleString() : 'Unknown';
+  const expires  = alert.expires_at ? new Date(alert.expires_at).toLocaleString() : null;
+  const color    = alert.severity === 1 ? '#C0392B'
+                 : alert.severity === 2 ? '#D4A017'
+                 : '#5A7A32';
+
+  // Render trigger_conditions as a compact "Why this is firing" grid
+  const SKIP_TC = new Set(['dedupe_key', 'nws_event_id', 'food_sources_checked',
+                            'affected_zones', 'qualifying_tracts', 'nws_expires']);
+  const tc = alert.trigger_conditions || {};
+  const tcEntries = Object.entries(tc).filter(([k, v]) => !SKIP_TC.has(k) && v != null);
+  const triggerHtml = tcEntries.length > 0 ? `
+    <div style="padding:10px 14px">
+      <div style="font-family:var(--font-label);font-size:8px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Why This Is Firing</div>
+      <dl style="display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:9px;line-height:1.6">
+        ${tcEntries.map(([k, v]) => {
+          const label = k.replace(/_/g, ' ');
+          const val = Array.isArray(v)
+            ? (v.length > 3 ? `${v.slice(0, 3).join(', ')} +${v.length - 3} more` : v.join(', '))
+            : k === 'search_radius_meters' ? `${(v / 1609.34).toFixed(1)} mi`
+            : typeof v === 'number' && v > 0 && v < 1 ? `${(v * 100).toFixed(0)}th pctile`
+            : String(v).length > 80 ? String(v).slice(0, 77) + '\u2026'
+            : String(v);
+          return `<dt style="color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;white-space:nowrap">${escHtml(label)}</dt><dd style="color:var(--text-secondary)">${escHtml(val)}</dd>`;
+        }).join('')}
+      </dl>
+    </div>` : '';
+
+  const div = document.createElement('div');
+  div.innerHTML = `
+    <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+        <span class="claim-badge claim-${escHtml(alert.claim_type)}">${escHtml(alert.claim_type)}</span>
+        <span style="font-family:var(--font-label);font-size:9px;color:${escHtml(color)};letter-spacing:0.1em">${escHtml(SEVERITY_LABEL[alert.severity] || '')}</span>
+      </div>
+      <div style="font-family:var(--font-body);font-size:13px;font-weight:600;color:var(--text-primary);line-height:1.4;margin-bottom:6px">${escHtml(alert.title)}</div>
+      ${alert.description ? `<p style="font-size:11px;line-height:1.5;color:var(--text-secondary);margin:0">${escHtml(alert.description)}</p>` : ''}
+    </div>
+    ${alert.recommendation ? `
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
+      <div style="font-family:var(--font-label);font-size:8px;letter-spacing:0.15em;text-transform:uppercase;color:var(--sprout);margin-bottom:5px">Recommended Action</div>
+      <p style="font-size:11px;line-height:1.5;color:var(--text-primary);margin:0">${escHtml(alert.recommendation)}</p>
+    </div>` : ''}
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
+      <div style="font-family:var(--font-label);font-size:8px;letter-spacing:0.15em;text-transform:uppercase;color:var(--amber);margin-bottom:5px">Epistemic Caution</div>
+      <p style="font-size:10px;line-height:1.5;color:var(--text-muted);margin:0;font-style:italic">${escHtml(alert.caution)}</p>
+    </div>
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
+      <div style="font-family:var(--font-label);font-size:8px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Sources</div>
+      <div style="font-size:10px;color:var(--text-secondary);line-height:1.7">${sources}</div>
+      <div style="margin-top:8px;font-size:9px;color:var(--text-muted)">Last evaluated: ${escHtml(updated)}</div>
+      ${expires ? `<div style="font-size:9px;color:var(--text-muted)">Expires: ${escHtml(expires)}</div>` : ''}
+    </div>
+    ${triggerHtml}
+  `;
+  return div;
 }
 
 function escHtml(str) {

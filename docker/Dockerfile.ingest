@@ -10,6 +10,11 @@ COPY ingest/ ./
 
 # Non-root user for security
 RUN addgroup -S cg && adduser -S cg -G cg
+
+# Copy entrypoint script and make executable (must happen as root, before USER cg)
+COPY docker/ingest-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 USER cg
 
-CMD ["node", "scheduler.js"]
+CMD ["/entrypoint.sh"]

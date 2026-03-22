@@ -699,6 +699,7 @@ async function addMapLayer(layer) {
 // â”€â”€ Info Drawer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 let _drawerEl = null;
+let _drawerCloseCallback = null;
 
 function initDrawer(map) {
   _drawerEl = document.createElement('div');
@@ -717,7 +718,7 @@ function initDrawer(map) {
     'font-family:var(--font-label);font-size:9px;letter-spacing:0.15em',
     'color:var(--text-muted);text-transform:uppercase;flex-shrink:0',
   ].join(';');
-  drawerHeader.innerHTML = '<span>Layer Data</span>';
+  drawerHeader.innerHTML = '<span id="info-drawer-title">Layer Data</span>';
 
   const closeBtn = document.createElement('button');
   closeBtn.textContent = 'âœ•';
@@ -734,6 +735,12 @@ function initDrawer(map) {
 
   // Click on map opens the drawer for polygon layers
   map.on('click', async (e) => {
+    // If an alert polygon fill was clicked, let the alert handler run instead.
+    // Alert polygon layers are named cg-alert-<id>-fill.
+    const hitAlertPolygon = map.queryRenderedFeatures(e.point)
+      .some(f => f.layer && f.layer.id && f.layer.id.startsWith('cg-alert-') && f.layer.id.endsWith('-fill'));
+    if (hitAlertPolygon) return;
+
     // If a point layer was clicked, let its popup handler run instead
     const pointLayerIds = Object.keys(layerState)
       .filter(slug => layerState[slug] && POINT_LAYER_SLUGS.has(slug))
@@ -754,12 +761,16 @@ function initDrawer(map) {
 
 function closeDrawer() {
   if (_drawerEl) _drawerEl.style.transform = 'translateX(100%)';
+  if (_drawerCloseCallback) { _drawerCloseCallback(); _drawerCloseCallback = null; }
 }
 
 async function openDrawer(lngLat, slugs) {
   if (!_drawerEl) return;
+  if (_drawerCloseCallback) { _drawerCloseCallback(); _drawerCloseCallback = null; }
+  const titleEl = document.getElementById('info-drawer-title');
+  if (titleEl) titleEl.textContent = 'Layer Data';
   const body = document.getElementById('info-drawer-body');
-  body.innerHTML = '<div style="padding:12px 14px;font-family:var(--font-label);font-size:10px;color:var(--text-muted)">Loadingâ€¦</div>';
+  body.innerHTML = '<div style="padding:12px 14px;font-family:var(--font-label);font-size:10px;color:var(--text-muted)">Loading\u2026</div>';
   _drawerEl.style.transform = 'translateX(0)';
 
   const slugParam = slugs.join(',');
@@ -1028,6 +1039,28 @@ function updateToggleUI(slug, active) {
 function getBbox(map) {
   const b = map.getBounds();
   return `${b.getWest().toFixed(6)},${b.getSouth().toFixed(6)},${b.getEast().toFixed(6)},${b.getNorth().toFixed(6)}`;
+}
+
+export function enableLayerBySlug(slug) {
+  if (!_layerMeta[slug] || layerState[slug]) return;
+  enableLayer(_layerMeta[slug]);
+}
+
+export function openDrawerWithContent(title, bodyEl, onClose) {
+  if (!_drawerEl) return;
+  // Fire any pending close callback before replacing content
+  if (_drawerCloseCallback) { _drawerCloseCallback(); _drawerCloseCallback = null; }
+  _drawerCloseCallback = onClose || null;
+  const titleEl = document.getElementById('info-drawer-title');
+  if (titleEl) titleEl.textContent = title;
+  const body = document.getElementById('info-drawer-body');
+  body.innerHTML = '';
+  if (bodyEl instanceof HTMLElement) {
+    body.appendChild(bodyEl);
+  } else {
+    body.innerHTML = String(bodyEl);
+  }
+  _drawerEl.style.transform = 'translateX(0)';
 }
 
 export async function refreshActiveLayers() {
