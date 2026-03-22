@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS layers (
     color            TEXT DEFAULT '#7FA843',
     active           BOOLEAN DEFAULT true,
     data_vintage     TEXT,
+    parent_slug      TEXT REFERENCES layers(slug),
+    is_composite     BOOLEAN DEFAULT false,
     last_updated     TIMESTAMPTZ,
     created_at       TIMESTAMPTZ DEFAULT NOW()
 );

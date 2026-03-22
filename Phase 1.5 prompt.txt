@@ -1,0 +1,162 @@
+You are helping build **CommonGround**, a civic community intelligence platform. Phases 1 and 1.5 are complete. You are beginning Phase 2. If you have not yet read Phase 2 prompt.txt, do so now — this file records what was accomplished in Phase 1.5.
+
+---
+
+## Phase 1.5 — COMPLETE
+
+Phase 1.5 was a UX and data layer refinement pass executed between Phase 1 and Phase 2. No new data sources were added. All changes operated on data already in the database.
+
+---
+
+## What Changed in Phase 1.5
+
+### 1. Layer Splitting (no re-ingest — data was already in DB)
+
+Four composite data sources were split into focused sub-layers. A `parent_slug TEXT` column was added to the `layers` table. Sub-layers reference their parent via `parent_slug`. When the features API receives a query for a sub-layer, it proxies to the parent's features table rows and returns the full properties JSONB — the client-side CHOROPLETH config selects which property to display.
+
+A `is_composite BOOLEAN DEFAULT false` column was also added. Composite parent layers have `is_composite = true` and are hidden from the sidebar by default. They are accessible via a "Show Composite Layers" toggle.
+
+#### EJScreen → 10 sub-layers
+
+| Slug | Name | Property | Color scale |
+|---|---|---|---|
+| `ejscreen-ej-score` | EJ Score | `ejscreen_pctile` | Green (percentile) |
+| `ejscreen-minority` | People of Color | `pct_minority` | Purple |
+| `ejscreen-under5` | Children Under 5 | `pct_under5` | Orange |
+| `ejscreen-over64` | Adults Over 64 | `pct_over64` | Orange |
+| `ejscreen-low-income` | Low Income Population | `pct_low_income` | Red |
+| `ejscreen-less-hs` | Education Below High School | `pct_less_hs` | Red |
+| `ejscreen-ozone` | Ozone Burden | `ozone_pctile` | Blue |
+| `ejscreen-pm25` | PM2.5 Fine Particulates | `pm25_pctile` | Blue |
+| `ejscreen-traffic` | Traffic Proximity | `traffic_pctile` | Yellow |
+| `ejscreen-rmp` | Industrial Hazard Facilities | `rmp_pctile` | Red |
+
+#### HUD CHAS → 3 sub-layers
+
+| Slug | Name | Property |
+|---|---|---|
+| `chas-cost-burdened` | Cost-Burdened Households (≥30%) | `pct_cost_burdened` |
+| `chas-severe-burden` | Severely Cost Burdened (≥50%) | `pct_severely_burdened` |
+| `chas-renter-burden` | Renter Cost Burden (≥30%) | `pct_renter_cost_burdened` (ratio computed from `renter_cost_burdened / renter_hh`, stored as a property on the features) |
+
+Note: owner cost burden sub-layer deferred to a later phase.
+
+#### Eviction Lab → 7 sub-layers
+
+| Slug | Name | Property | Scale |
+|---|---|---|---|
+| `eviction-filing-rate` | Eviction Filing Rate | `eviction_filing_rate` | 0–1 fractional |
+| `eviction-rate` | Completed Eviction Rate | `eviction_rate` | 0–1 fractional |
+| `eviction-rent-burden` | Rent Burden | `rent_burden` | 0–1 fractional |
+| `eviction-renter-pct` | Renter-Occupied Households | `pct_renter_occupied` | 0–1 fractional |
+| `eviction-poverty` | Poverty Rate | `pct_poverty` | 0–1 fractional |
+| `eviction-median-rent` | Median Gross Rent | `median_gross_rent` | Dollar ($300–$1,800) — 2018 snapshot |
+| `eviction-median-income` | Median Household Income | `median_household_income` | Dollar ($10k–$90k) — 2018 snapshot |
+
+Dollar-amount layers display a "2018 historical snapshot — not current" disclaimer in the feature popup.
+
+#### SVI → 5 sub-layers (CDC's 4 official themes + overall)
+
+| Slug | Name | Property |
+|---|---|---|
+| `svi-overall` | Social Vulnerability: Overall | `svi_overall` |
+| `svi-socioeconomic` | SVI: Socioeconomic | `svi_socioeconomic` |
+| `svi-household` | SVI: Household Vulnerability | `svi_household` |
+| `svi-minority-language` | SVI: Race & Language | `svi_minority_lang` |
+| `svi-housing-transit` | SVI: Housing & Transport | `svi_housing_transit` |
+
+---
+
+### 2. OSM Resources — improved categorization
+
+- Removed `pharmacy` from the Overpass query (commercial, not community infrastructure)
+- `place_of_worship` retained — many serve as voting locations and community hubs
+- Added `category_label` property (human-readable, e.g. "Community Center", "Food Pantry", "Place of Worship") derived from OSM amenity tags
+- Feature popup now shows `category_label` prominently in the header instead of raw OSM tag
+
+---
+
+### 3. Layer Grouping Toggle
+
+A toggle above the layer list in the sidebar switches between two grouping modes:
+
+- **By Source** (original Phase 1 behavior): Environmental, Food Access, Housing, Health, Community
+- **By Data Type**: Population Indicators, Environmental Burden, Housing Stability, Health Access, Community Infrastructure
+
+Each sub-layer has a `dataType` field in the frontend `LAYER_CONFIG` that determines its Data Type group membership.
+
+---
+
+### 4. Info Drawer (consolidated area-layer info)
+
+Replaced individual floating popups for area/polygon layers with a fixed right-side drawer:
+
+- **Polygon/area layers** (tract, block group, neighborhood aggregation levels): clicking the map opens the drawer with one collapsible card per active layer that has data at that point. First card auto-expands.
+- **Point layers** (`fqhc`, `snap-retailers`, `airnow`, `osm-resources`): continue to use the existing MapLibre Popup.
+- Each drawer card shows: key metric with choropleth color swatch, claim type badge, source citation, trust rating, and (for the neighborhood-assoc layer) meeting schedule and contact.
+- Powered by new API endpoint: `GET /features?point=lng,lat&layers=slug1,slug2`
+- Drawer can be dismissed with a close button; re-opens on next map click.
+
+---
+
+## Database Schema (After Phase 1.5)
+
+```sql
+layers (
+  id            SERIAL PRIMARY KEY,
+  slug          TEXT UNIQUE NOT NULL,
+  name          TEXT NOT NULL,
+  description   TEXT,
+  source_url    TEXT,
+  trust_rating  INTEGER CHECK (trust_rating BETWEEN 1 AND 5),
+  claim_type    TEXT CHECK (claim_type IN ('DOCUMENTED','MECHANISM','CORRELATION')),
+  update_frequency TEXT,
+  data_vintage  TEXT,
+  parent_slug   TEXT REFERENCES layers(slug),   -- added Phase 1.5
+  is_composite  BOOLEAN DEFAULT false,           -- added Phase 1.5
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+)
+```
+
+All other tables (`features`, `alerts`, `resources`) unchanged from Phase 1.
+
+---
+
+## API Endpoints (After Phase 1.5)
+
+```
+GET  /layers                                      — list layers; excludes is_composite=true by default
+GET  /layers?include_composite=true               — list all layers including composite parents
+GET  /features?layer=X&bbox=W,S,E,N              — GeoJSON features (if layer has parent_slug, proxies to parent)
+GET  /features?point=lng,lat&layers=s1,s2,s3     — point-query: features from each layer at a lat/lon point
+GET  /alerts?bbox=W,S,E,N&severity=X             — unchanged
+GET  /weather?lat=X&lon=Y                         — unchanged
+POST /resources                                   — unchanged
+```
+
+---
+
+## Phase 2 Signal Engine Notes (Cross-Phase Dependency)
+
+The Phase 2 signal engine references composite layer slugs directly, not sub-layer slugs:
+- T2-ENV01 queries `ejscreen_pctile` from the `ejscreen` parent layer
+- T1-E01 queries `svi_overall` from the `svi` parent layer
+- T3-R01 queries `svi_overall` from the `svi` parent layer
+
+Do not delete or modify the composite parent layer rows in the `layers` table. The `is_composite = true` flag hides them from the user-facing sidebar — they remain fully queryable by the signal engine.
+
+---
+
+## Key Lessons Carried Forward (Phase 1 + 1.5)
+
+- **MapLibre font names:** Liberty style only: `Noto Sans Regular`, `Noto Sans Italic`, `Noto Sans Bold`. Any other font wipes all dynamically-added layers.
+- **Docker compose:** Always `docker compose -f docker/docker-compose.yml ...` from project root.
+- **Data vintage:** All new layers must populate `data_vintage`.
+- **Ingest pattern:** `const CONFIG = { ... }` block at the top of each seed script.
+- **Sub-layer feature queries:** Sub-layers have `parent_slug` set and no own rows in `features`. The API resolves the parent; the frontend CHOROPLETH config selects the display property from the full JSONB.
+- **Drawer vs popup:** Drawer = polygon/area layers (multiple can be active). Popup = point layers.
+- **Composite layers:** `is_composite = true` hides from sidebar but preserves for signal engine queries.
+
+---
+
+You now have full Phase 1, 1.5, and upcoming Phase 2 context. Proceed with Phase 2 as described in Phase 2 prompt.txt unless directed otherwise.

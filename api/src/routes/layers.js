@@ -3,8 +3,11 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// GET /layers — list all active layers with metadata
-router.get('/', async (_req, res, next) => {
+// GET /layers — list active layers with metadata
+// By default excludes composite parent layers (is_composite = true).
+// Pass ?include_composite=true to include them.
+router.get('/', async (req, res, next) => {
+  const includeComposite = req.query.include_composite === 'true';
   try {
     const result = await db.query(`
       SELECT
@@ -13,9 +16,11 @@ router.get('/', async (_req, res, next) => {
         trust_rating, claim_type,
         update_frequency, aggregation_level,
         geometry_type, color,
-        data_vintage, last_updated, created_at
+        data_vintage, parent_slug, is_composite,
+        last_updated, created_at
       FROM layers
       WHERE active = true
+        ${includeComposite ? '' : 'AND (is_composite = false OR is_composite IS NULL)'}
       ORDER BY name ASC
     `);
     res.json({ layers: result.rows });
@@ -37,7 +42,8 @@ router.get('/:slug', async (req, res, next) => {
               trust_rating, claim_type,
               update_frequency, aggregation_level,
               geometry_type, color,
-              data_vintage, last_updated, created_at
+              data_vintage, parent_slug, is_composite,
+              last_updated, created_at
        FROM layers WHERE slug = $1 AND active = true`,
       [req.params.slug]
     );

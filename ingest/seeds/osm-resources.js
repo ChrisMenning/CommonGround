@@ -19,7 +19,7 @@ const BROWN_COUNTY_BBOX = '44.24,-88.25,44.74,-87.82';
 
 const QUERY = `[out:json][timeout:60];
 (
-  node["amenity"~"^(community_centre|social_facility|clinic|health_centre|library|food_bank|shelter|place_of_worship|pharmacy)$"](${BROWN_COUNTY_BBOX});
+  node["amenity"~"^(community_centre|social_facility|clinic|health_centre|library|food_bank|shelter|place_of_worship)$"](${BROWN_COUNTY_BBOX});
   node["leisure"="park"](${BROWN_COUNTY_BBOX});
   node["shop"="food_bank"](${BROWN_COUNTY_BBOX});
 );
@@ -68,15 +68,30 @@ async function run() {
   const elements = (data.elements || []).filter(e => e.type === 'node' && e.lat && e.lon);
   logger.info(`Retrieved ${elements.length} OSM nodes`);
 
+  const CATEGORY_LABELS = {
+    community_centre: 'Community Center',
+    social_facility:  'Social Services',
+    clinic:           'Health Clinic',
+    health_centre:    'Health Center',
+    library:          'Public Library',
+    food_bank:        'Food Pantry / Food Bank',
+    shelter:          'Emergency Shelter',
+    place_of_worship: 'Place of Worship / Community Hub',
+    park:             'Park',
+  };
+
   const features = elements.map(e => {
     const tags = e.tags || {};
+    const amenityKey = tags.amenity || tags.leisure || tags.shop || 'unknown';
+    const categoryLabel = CATEGORY_LABELS[amenityKey] || amenityKey;
     return {
       geojsonGeometry: { type: 'Point', coordinates: [e.lon, e.lat] },
       aggregationLevel: 'point',
       properties: {
         osm_id:    e.id,
         name:      tags.name || tags['name:en'] || 'Unknown',
-        amenity:   tags.amenity || tags.leisure || tags.shop || 'unknown',
+        category_label: categoryLabel,
+        amenity:   amenityKey,
         address:   [tags['addr:housenumber'], tags['addr:street'], tags['addr:city']].filter(Boolean).join(' '),
         phone:     tags.phone || tags['contact:phone'] || null,
         website:   tags.website || tags['contact:website'] || null,

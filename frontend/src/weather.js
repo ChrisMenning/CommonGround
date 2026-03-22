@@ -10,6 +10,7 @@
  */
 'use strict';
 import { apiFetch } from './api-client.js';
+import ICONS from './_icons.js';
 
 let _map = null;
 
@@ -114,9 +115,12 @@ function renderWeather(data) {
   const windDir  = period.windDirection ?? '';
   const isDaytime = period.isDaytime !== false;
 
+  const iconEl = makeWeatherIconEl(forecast, isDaytime);
+  const iconHtml = iconEl ? iconEl.outerHTML : '';
+
   currentEl.innerHTML = `
     <div class="weather-row">
-      <span class="weather-icon">${isDaytime ? '☀' : '☾'}</span>
+      ${iconHtml}
       <span class="weather-temp">${escHtml(String(temp))}°${escHtml(unit)}</span>
       <span class="weather-desc">${escHtml(forecast)}</span>
     </div>
@@ -142,4 +146,37 @@ function escHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// Map a NWS shortForecast string + isDaytime flag to a Phosphor weather icon key.
+function weatherIconKey(forecast, isDaytime) {
+  const f = (forecast || '').toLowerCase();
+  if (f.includes('thunder') || f.includes('lightning'))  return 'weather_thunder';
+  if (f.includes('snow') || f.includes('blizzard'))       return 'weather_snow';
+  if (f.includes('sleet') || f.includes('freezing rain')) return 'weather_snow';
+  if (f.includes('rain') || f.includes('shower') || f.includes('drizzle')) return 'weather_rain';
+  if (f.includes('fog') || f.includes('haze') || f.includes('mist'))       return 'weather_fog';
+  if (f.includes('wind') || f.includes('breezy') || f.includes('blustery')) return 'weather_wind';
+  if (f.includes('cloud') || f.includes('overcast'))      return 'weather_cloudy';
+  if (f.includes('partly') || f.includes('mostly'))       return isDaytime ? 'weather_partly' : 'weather_night';
+  if (!isDaytime)                                          return 'weather_night';
+  return 'weather_sunny';
+}
+
+// Return a 16×16 <img> element using the appropriate Phosphor weather icon.
+function makeWeatherIconEl(forecast, isDaytime) {
+  const key = weatherIconKey(forecast, isDaytime);
+  const svg = ICONS[key];
+  if (!svg) return null;
+  const color = isDaytime ? '#D4A017' : '#B8A070';
+  const colored = svg
+    .replace('fill="currentColor"', `fill="${color}"`)
+    .replace('<svg ', '<svg width="16" height="16" ');
+  const img = document.createElement('img');
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(colored);
+  img.width = 16;
+  img.height = 16;
+  img.style.cssText = 'vertical-align:middle;flex-shrink:0';
+  img.alt = '';
+  return img;
 }

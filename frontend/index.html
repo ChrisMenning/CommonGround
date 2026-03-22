@@ -139,6 +139,7 @@
 
     .layer-item {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 8px;
       padding: 7px 16px;
@@ -148,6 +149,25 @@
       color: var(--text-secondary);
       transition: background 0.1s;
       user-select: none;
+    }
+
+    .layer-opacity-row {
+      display: none;
+      flex-basis: 100%;
+      align-items: center;
+      gap: 6px;
+      padding: 0 0 5px 18px;
+      margin-top: -2px;
+    }
+    .layer-item.active .layer-opacity-row {
+      display: flex;
+    }
+    .layer-opacity-row input[type=range] {
+      flex: 1;
+      height: 3px;
+      accent-color: var(--sprout);
+      cursor: pointer;
+      background: transparent;
     }
 
     .layer-item:hover {
@@ -197,8 +217,8 @@
     }
 
     .trust-pip {
-      font-family: var(--font-label);
-      font-size: 8px;
+      font-family: 'Segoe UI Symbol', 'Apple Color Emoji', 'Noto Sans Symbols', var(--font-label);
+      font-size: 9px;
       color: var(--text-muted);
       margin-left: auto;
       letter-spacing: 0;
@@ -572,6 +592,14 @@
     }
 
     .maplibregl-ctrl-attrib a { color: var(--text-muted) !important; }
+
+    /* ── Info Drawer ── */
+    #info-drawer {
+      font-family: var(--font-label);
+    }
+    #info-drawer-body::-webkit-scrollbar { width: 4px; }
+    #info-drawer-body::-webkit-scrollbar-track { background: var(--bark); }
+    #info-drawer-body::-webkit-scrollbar-thumb { background: var(--bark-light); border-radius: 2px; }
   </style>
 </head>
 <body>
