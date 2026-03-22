@@ -177,14 +177,27 @@ All data sources, their provenance, trust ratings, update schedules, and coverag
 
 ## Phase 2 Sources (Pending Review)
 
-| Source | Blocker |
-|---|---|
-| Wisconsin CCAP (eviction court records) | Legal review required — court record access, re-identification risk |
-| DeFlock (ALPR surveillance locations) | Data availability and terms review |
-| HMDA (mortgage lending) | Ingest design |
-| FEMA Flood Hazard | Integration design |
-| CDC PLACES | Ingest design |
-| Property ownership / LLC networks | Legal review — potential re-identification risk |
+| Source | Slug | Blocker |
+|---|---|---|
+| Community Fridges (Wisconsin) | `free-fridges` | No machine-readable API found. WPR article (2026-03-22) is active research lead — see notes below. Fallback: manual admin-trigger entry form. |
+| Mutual Aid Hub | `mutual-aid-hub` | Unclear if MutualAidHub has a public API or bulk export. Coverage will be uneven; trust ceiling 2/5. |
+| Green Bay Municipal Permits | `gb-permits` | Depends on Phase 2 admin interface (see DECISION-LOG 2026-03-22). Check GB open data portal for building/assembly permit feed. Shared source for T2-H01 and T3-S01. |
+| Wisconsin CCAP (eviction court records) | `ccap` | Legal review required — court record access, re-identification risk |
+| DeFlock (ALPR surveillance locations) | `defloc-alpr` | Data availability and terms review |
+| HMDA (mortgage lending) | `hmda` | Ingest design |
+| FEMA Flood Hazard | `fema-flood` | Integration design |
+| CDC PLACES | `cdc-places` | Ingest design |
+| Property ownership / LLC networks | — | Legal review — potential re-identification risk |
+
+### Community Fridges — Research Notes
+
+- **WPR article lead (2026-03-22):** https://www.wpr.org/news/community-fridges-wisconsin-fill-growing-need-fresh-produce
+  Identify organizations named in the article; check if any maintain a public directory or are open to a data-sharing arrangement for Brown County locations.
+- **FreeFridges.net:** Check for a machine-readable endpoint or bulk export for Wisconsin; none confirmed as of 2026-03-22.
+- **211 Wisconsin:** Potential fallback directory — fridges may be listed as food resources in their database (already a named fallback in `t1-f01.js`).
+- **Trust ceiling:** Community-sourced or organization-reported data. Maximum 3/5; actual rating depends on update cadence of whichever source lands.
+- **Claim type:** `DOCUMENTED` (locations are real infrastructure; status self-reported).
+- **Ingest stub:** `ingest/seeds/free-fridges.js` (not yet implemented). Signals blocked: T1-F01 (fully), T2-F01 (partial extension).
 
 ---
 
