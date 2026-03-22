@@ -105,6 +105,34 @@ INSERT INTO layers (slug, name, description, source, source_url, trust_rating, c
 ON CONFLICT (slug) DO NOTHING;
 
 -- ============================================================
+-- source_configs — admin-configurable data source settings
+-- Added Phase 2 (admin interface)
+-- Seed scripts read this table at run-time to pick up operator
+-- overrides for endpoint URLs, enabled/disabled state, and
+-- per-municipality endpoint differences.
+-- municipality = '' means the config applies to all municipalities.
+-- endpoint_url = NULL means "use the default hardcoded in the seed".
+-- ============================================================
+CREATE TABLE IF NOT EXISTS source_configs (
+    id              SERIAL PRIMARY KEY,
+    slug            TEXT        NOT NULL,
+    municipality    TEXT        NOT NULL DEFAULT '',
+    endpoint_url    TEXT,
+    endpoint_format TEXT        CHECK (endpoint_format IN ('json','csv','geojson','xlsx','arcgis-rest'))
+                                DEFAULT 'json',
+    enabled         BOOLEAN     NOT NULL DEFAULT true,
+    status          TEXT        NOT NULL DEFAULT 'active'
+                                CHECK (status IN ('active','degraded','blocked','pending')),
+    status_note     TEXT,
+    config_json     JSONB       NOT NULL DEFAULT '{}',
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by      TEXT        NOT NULL DEFAULT 'system',
+    UNIQUE(slug, municipality)
+);
+
+CREATE INDEX IF NOT EXISTS source_configs_slug_idx ON source_configs(slug);
+
+-- ============================================================
 -- signal_runs — audit log for signal engine evaluations
 -- Added Phase 2
 -- ============================================================

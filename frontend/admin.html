@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- No analytics, no tracking, no external scripts -->
+  <title>CommonGround — Admin</title>
+  <style>
+    /* ── Design tokens (mirror main app) ── */
+    :root {
+      --soil:           #1A1208;
+      --bark:           #2D1F0E;
+      --bark-light:     #3D2A14;
+      --bark-mid:       #4A3018;
+      --leaf:           #5A7A32;
+      --sprout:         #7FA843;
+      --amber:          #D4A017;
+      --amber-dim:      #9A7210;
+      --teal:           #2196A5;
+      --text-primary:   #E8D5A3;
+      --text-secondary: #B8A070;
+      --text-muted:     #7A6040;
+      --border:         #4A3520;
+      --danger:         #C0392B;
+      --danger-dim:     #8B2520;
+      --font-label:     'Courier New', 'Courier', monospace;
+      --font-body:      Georgia, 'Times New Roman', serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; min-height: 100%;
+      background: var(--soil);
+      color: var(--text-primary);
+      font-family: var(--font-label);
+      font-size: 13px;
+    }
+
+    /* ── Login screen ── */
+    #login-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .login-card {
+      background: var(--bark);
+      border: 2px solid var(--border);
+      padding: 36px 40px;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .login-card h1 {
+      color: var(--sprout);
+      font-size: 18px;
+      letter-spacing: 0.15em;
+      margin-bottom: 6px;
+    }
+
+    .login-card .subtitle {
+      color: var(--text-muted);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      margin-bottom: 28px;
+    }
+
+    /* ── App shell ── */
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+
+    #app-header {
+      background: var(--bark);
+      border-bottom: 2px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    #app-header .wordmark {
+      color: var(--sprout);
+      font-size: 16px;
+      letter-spacing: 0.15em;
+      font-weight: bold;
+    }
+
+    #app-header .wordmark span {
+      color: var(--amber);
+      font-size: 10px;
+      margin-left: 10px;
+      letter-spacing: 0.1em;
+      vertical-align: middle;
+    }
+
+    /* ── Tab nav ── */
+    #tab-nav {
+      background: var(--bark-light);
+      border-bottom: 2px solid var(--border);
+      display: flex;
+      padding: 0 20px;
+      gap: 0;
+      flex-shrink: 0;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: var(--font-label);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      padding: 10px 18px;
+      transition: color 0.15s, border-color 0.15s;
+      position: relative;
+      bottom: -2px;
+    }
+
+    .tab-btn:hover { color: var(--text-secondary); }
+    .tab-btn.active { color: var(--sprout); border-bottom-color: var(--sprout); }
+
+    .tab-btn .badge-count {
+      background: var(--amber);
+      color: var(--soil);
+      border-radius: 10px;
+      font-size: 9px;
+      padding: 1px 5px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    /* ── Main content ── */
+    #main-content { flex: 1; overflow-y: auto; padding: 20px; }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Tab header row ── */
+    .tab-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .tab-header h2 {
+      font-size: 14px;
+      letter-spacing: 0.12em;
+      color: var(--text-secondary);
+      font-weight: normal;
+    }
+
+    /* ── Forms and controls ── */
+    label {
+      display: block;
+      color: var(--text-secondary);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="url"],
+    select,
+    textarea {
+      width: 100%;
+      background: var(--bark-mid);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-family: var(--font-label);
+      font-size: 12px;
+      padding: 7px 10px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus,
+    input[type="url"]:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--sprout);
+    }
+
+    textarea { resize: vertical; min-height: 80px; }
+    select option { background: var(--bark-mid); }
+
+    .form-group { margin-bottom: 14px; }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .form-row-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      width: 14px; height: 14px;
+      accent-color: var(--sprout);
+      cursor: pointer;
+    }
+
+    .checkbox-row label {
+      margin: 0;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-family: var(--font-label);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      padding: 7px 14px;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+
+    .btn:hover { background: var(--bark-light); color: var(--text-primary); }
+
+    .btn-primary {
+      background: var(--leaf);
+      border-color: var(--sprout);
+      color: var(--soil);
+      font-weight: bold;
+    }
+
+    .btn-primary:hover { background: var(--sprout); }
+
+    .btn-danger {
+      border-color: var(--danger-dim);
+      color: var(--danger);
+    }
+
+    .btn-danger:hover { background: var(--danger-dim); color: var(--text-primary); }
+
+    .btn-sm { padding: 4px 10px; font-size: 10px; }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* ── Tables ── */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .data-table th {
+      background: var(--bark-light);
+      border-bottom: 2px solid var(--border);
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: normal;
+      letter-spacing: 0.1em;
+      padding: 8px 12px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .data-table td {
+      border-bottom: 1px solid var(--border);
+      padding: 9px 12px;
+      vertical-align: middle;
+    }
+
+    .data-table tr:hover td { background: var(--bark-light); }
+
+    .data-table .actions { white-space: nowrap; text-align: right; }
+    .data-table .actions .btn + .btn { margin-left: 6px; }
+
+    .cell-slug  { font-family: var(--font-label); color: var(--amber); }
+    .cell-url   { color: var(--text-muted); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cell-note  { color: var(--text-muted); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── Status badges ── */
+    .badge {
+      border-radius: 2px;
+      font-size: 9px;
+      font-weight: bold;
+      letter-spacing: 0.1em;
+      padding: 2px 7px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .badge-active   { background: var(--leaf);       color: var(--soil); }
+    .badge-degraded { background: var(--amber-dim);  color: var(--text-primary); }
+    .badge-blocked  { background: var(--danger-dim); color: var(--text-primary); }
+    .badge-pending  { background: var(--bark-mid);   color: var(--text-secondary); border: 1px solid var(--border); }
+
+    .badge-enabled  { background: var(--leaf);  color: var(--soil); }
+    .badge-disabled { background: var(--bark-mid); color: var(--text-muted); border: 1px solid var(--border); }
+
+    /* ── Alert / info boxes ── */
+    .info-box {
+      background: var(--bark-light);
+      border-left: 3px solid var(--teal);
+      color: var(--text-secondary);
+      font-size: 11px;
+      line-height: 1.6;
+      margin-bottom: 16px;
+      padding: 10px 14px;
+    }
+
+    .info-box.warn { border-left-color: var(--amber); }
+    .info-box.error { border-left-color: var(--danger); }
+
+    /* ── Toast notifications ── */
+    #toast-container {
+      bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+      position: fixed;
+      right: 20px;
+      z-index: 1000;
+    }
+
+    .toast {
+      background: var(--bark-light);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--sprout);
+      color: var(--text-primary);
+      font-family: var(--font-label);
+      font-size: 12px;
+      max-width: 340px;
+      padding: 10px 14px;
+      pointer-events: all;
+      transition: opacity 0.3s;
+    }
+
+    .toast.error { border-left-color: var(--danger); }
+
+    /* ── Modal (dialog) ── */
+    dialog {
+      background: var(--bark);
+      border: 2px solid var(--border);
+      color: var(--text-primary);
+      font-family: var(--font-label);
+      max-height: 90vh;
+      max-width: 560px;
+      overflow-y: auto;
+      padding: 0;
+      width: 95vw;
+    }
+
+    dialog::backdrop {
+      background: rgba(26, 18, 8, 0.85);
+    }
+
+    .modal-header {
+      background: var(--bark-light);
+      border-bottom: 2px solid var(--border);
+      padding: 14px 20px;
+    }
+
+    .modal-header h3 {
+      color: var(--sprout);
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 0.12em;
+    }
+
+    .modal-body { padding: 20px; }
+
+    .modal-footer {
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      padding: 14px 20px;
+    }
+
+    /* ── Empty state ── */
+    .empty-state {
+      color: var(--text-muted);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      padding: 40px;
+      text-align: center;
+    }
+
+    /* ── Signal run event log ── */
+    .run-error { color: var(--danger); font-family: var(--font-label); font-size: 11px; }
+
+    /* ── Misc ── */
+    .text-muted  { color: var(--text-muted); }
+    .text-danger { color: var(--danger); }
+    .mt-4 { margin-top: 16px; }
+    .table-scroll { overflow-x: auto; }
+  </style>
+</head>
+<body>
+
+<!-- ── Login screen ─────────────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <h1>COMMONGROUND</h1>
+    <div class="subtitle">ADMIN INTERFACE</div>
+    <form id="login-form">
+      <div class="form-group">
+        <label for="token-input">ADMIN TOKEN</label>
+        <input type="password" id="token-input" autocomplete="current-password"
+               placeholder="Enter admin token" autofocus required>
+      </div>
+      <div id="login-error" class="info-box error" style="display:none;margin-bottom:12px"></div>
+      <button type="submit" class="btn btn-primary" style="width:100%">SIGN IN</button>
+    </form>
+  </div>
+</div>
+
+<!-- ── App shell ─────────────────────────────────────────────────────────────── -->
+<div id="app">
+  <header id="app-header">
+    <div class="wordmark">COMMONGROUND <span>/ ADMIN</span></div>
+    <button id="logout-btn" class="btn btn-sm">SIGN OUT</button>
+  </header>
+
+  <nav id="tab-nav">
+    <button class="tab-btn active" data-tab="sources">DATA SOURCES</button>
+    <button class="tab-btn" data-tab="layers">LAYERS</button>
+    <button class="tab-btn" data-tab="resources">
+      PENDING RESOURCES <span id="resources-count" class="badge-count" style="display:none"></span>
+    </button>
+    <button class="tab-btn" data-tab="signal-runs">SIGNAL RUNS</button>
+  </nav>
+
+  <main id="main-content">
+
+    <!-- ── Sources tab ── -->
+    <section id="tab-sources" class="tab-panel active">
+      <div class="tab-header">
+        <h2>DATA SOURCE CONFIGURATION</h2>
+        <button id="add-source-btn" class="btn btn-primary btn-sm">+ NEW SOURCE</button>
+      </div>
+      <div class="info-box">
+        Each row represents a data source the ingest system can pull from.
+        Set the endpoint URL if a source has moved, toggle <strong>enabled</strong> to
+        pause ingestion, or mark a source <strong>blocked / degraded</strong> with a note
+        explaining why. Add municipality-specific rows (e.g. <em>green-bay</em>) for
+        sources that vary by jurisdiction.
+      </div>
+      <div id="sources-table" class="table-scroll">
+        <div class="empty-state">Loading…</div>
+      </div>
+    </section>
+
+    <!-- ── Layers tab ── -->
+    <section id="tab-layers" class="tab-panel">
+      <div class="tab-header">
+        <h2>MAP LAYERS</h2>
+      </div>
+      <div class="info-box">
+        Edit layer metadata: trust ratings, source URLs, active status, and colors.
+        Deactivating a layer hides it from the public map but preserves its data.
+      </div>
+      <div id="layers-table" class="table-scroll">
+        <div class="empty-state">Loading…</div>
+      </div>
+    </section>
+
+    <!-- ── Resources tab ── -->
+    <section id="tab-resources" class="tab-panel">
+      <div class="tab-header">
+        <h2>PENDING COMMUNITY RESOURCES</h2>
+        <div style="display:flex;gap:8px">
+          <button id="show-pending-btn" class="btn btn-sm active-filter">PENDING</button>
+          <button id="show-approved-btn" class="btn btn-sm">APPROVED</button>
+        </div>
+      </div>
+      <div class="info-box">
+        Community-submitted resource locations. Approve to make visible on the map;
+        delete to reject. Approved resources will be aggregated to block-group level before display.
+      </div>
+      <div id="resources-table" class="table-scroll">
+        <div class="empty-state">Loading…</div>
+      </div>
+    </section>
+
+    <!-- ── Signal runs tab ── -->
+    <section id="tab-signal-runs" class="tab-panel">
+      <div class="tab-header">
+        <h2>SIGNAL ENGINE AUDIT LOG</h2>
+        <select id="runs-days-select" class="btn btn-sm" style="width:auto">
+          <option value="1">Last 24 hours</option>
+          <option value="7" selected>Last 7 days</option>
+          <option value="30">Last 30 days</option>
+        </select>
+      </div>
+      <div id="signal-runs-table" class="table-scroll">
+        <div class="empty-state">Loading…</div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ── Toast container ──────────────────────────────────────────────────────── -->
+<div id="toast-container"></div>
+
+<!-- ── Edit modal ───────────────────────────────────────────────────────────── -->
+<dialog id="edit-modal" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal-header">
+    <h3 id="modal-title">EDIT</h3>
+  </div>
+  <div class="modal-body" id="modal-body"></div>
+  <div class="modal-footer">
+    <button id="modal-cancel-btn" class="btn">CANCEL</button>
+    <button id="modal-save-btn" class="btn btn-primary">SAVE</button>
+  </div>
+</dialog>
+
+<script src="admin.bundle.js"></script>
+</body>
+</html>

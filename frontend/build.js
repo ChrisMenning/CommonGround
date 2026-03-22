@@ -112,13 +112,39 @@ const buildOptions = {
   },
 };
 
+// Admin interface — separate bundle, no MapLibre dependency
+const adminBuildOptions = {
+  entryPoints: ['src/admin.js'],
+  bundle: true,
+  outfile: 'dist/admin.bundle.js',
+  platform: 'browser',
+  format: 'iife',
+  minify: isProd,
+  sourcemap: !isProd,
+  target: ['es2020', 'chrome90', 'firefox90', 'safari14'],
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+  },
+};
+
+// Copy admin HTML to dist
+fs.copyFileSync(path.join(__dirname, 'admin.html'), 'dist/admin.html');
+console.log('[build] Copied admin.html');
+
 if (watch) {
-  esbuild.context(buildOptions).then(ctx => {
+  Promise.all([
+    esbuild.context(buildOptions),
+    esbuild.context(adminBuildOptions),
+  ]).then(([ctx, adminCtx]) => {
     ctx.watch();
+    adminCtx.watch();
     console.log('[build] Watching for changes...');
   });
 } else {
-  esbuild.build(buildOptions).then(() => {
-    console.log('[build] dist/app.bundle.js — done');
+  Promise.all([
+    esbuild.build(buildOptions),
+    esbuild.build(adminBuildOptions),
+  ]).then(() => {
+    console.log('[build] dist/app.bundle.js + dist/admin.bundle.js — done');
   }).catch(() => process.exit(1));
 }

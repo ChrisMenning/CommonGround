@@ -27,25 +27,27 @@
 const db     = require('../lib/db');
 const logger = require('../lib/logger');
 const { fetchJson, insertFeatures } = require('../lib/utils');
+const { getSourceConfig } = require('../lib/source-config');
 
 // ============================================================
-// CONFIGURATION — edit this block for other jurisdictions
+// DEFAULT CONFIGURATION — values here are used as fallbacks.
+// The operator can override endpoint_url and other fields
+// via the admin interface (source_configs table, slug='neighborhood-assoc',
+// municipality='green-bay').
+// To add a second municipality, seed a new source_configs row with
+// the appropriate slug, municipality, and endpoint_url, and run this
+// script once per municipality.
 // ============================================================
-const CONFIG = {
+const DEFAULT_CONFIG = {
   // Jurisdiction label — used in log messages
   jurisdiction: 'City of Green Bay, WI',
 
   // ArcGIS query URL.  ?where=1%3D1 means "all features".
-  // Swap this entire URL for a different city/county's service.
-  api_url:
-    'https://map.greenbaywi.gov/server/rest/services/CED/NeighborhoodAssociations/MapServer/0/query'
-    + '?where=1%3D1'
-    + '&outFields=ID,N_ASSOCIAT,PRESIDENT,E_MAIL_ADD,MEET_PLACE,MEET_DATE_,STATUS'
-    + '&f=geojson'
-    + '&resultRecordCount=500',
+  // This default is overridden by admin source config when set.
+  api_base:
+    'https://map.greenbaywi.gov/server/rest/services/CED/NeighborhoodAssociations/MapServer/0',
 
   // Map the source GIS field names → our DB property names.
-  // If your service uses different field names, update these.
   field_map: {
     association_id: 'ID',
     name:           'N_ASSOCIAT',
@@ -57,7 +59,6 @@ const CONFIG = {
   },
 
   // The value in the "status" field that means an association is active.
-  // Used to set the is_active boolean property.
   active_status_value: 'ACTIVE',
 };
 // ============================================================
@@ -115,8 +116,14 @@ async function ensureLayerRecord(client) {
   `);
 }
 
-async function fromApi() {
-  const geojson = await fetchJson(CONFIG.api_url);
+async function fromApi(apiBase, fm, active_status_value, jurisdiction) {
+  const apiUrl = apiBase.replace(/\/$/, '') + '/query'
+    + '?where=1%3D1'
+    + '&outFields=ID,N_ASSOCIAT,PRESIDENT,E_MAIL_ADD,MEET_PLACE,MEET_DATE_,STATUS'
+    + '&f=geojson'
+    + '&resultRecordCount=500';
+
+  const geojson = await fetchJson(apiUrl);
   if (geojson.error) {
     throw new Error(`ArcGIS error ${geojson.error.code}: ${geojson.error.message}`);
   }
@@ -140,8 +147,8 @@ async function fromApi() {
         meet_place:     (p[fm.meet_place]     || '').trim() || null,
         meet_schedule:  (p[fm.meet_schedule]  || '').trim() || null,
         status:         (p[fm.status]         || '').trim().toUpperCase(),
-        is_active:      (p[fm.status]         || '').trim().toUpperCase() === CONFIG.active_status_value,
-        jurisdiction:   CONFIG.jurisdiction,
+        is_active:      (p[fm.status]         || '').trim().toUpperCase() === active_status_value,
+        jurisdiction,
         source:         'City of Green Bay GIS',
         data_year:      new Date().getFullYear(),
       },
@@ -153,7 +160,28 @@ async function fromApi() {
 }
 
 async function run() {
-  logger.info(`Fetching neighborhood associations for ${CONFIG.jurisdiction}...`);
+  // Load configuration from admin source_configs, falling back to built-in defaults.
+  // municipality='green-bay' row takes precedence; fall back to '' (universal) if absent.
+  const adminCfg  = await getSourceConfig('neighborhood-assoc', 'green-bay');
+
+  if (!adminCfg.enabled) {
+    logger.info('[neighborhood-assoc] Disabled in admin source config — skipping.');
+    await db.end();
+    return;
+  }
+
+  // Merge admin overrides with defaults.
+  // config_json can carry field_map / active_status_value / jurisdiction overrides.
+  const extra    = adminCfg.config_json || {};
+  const apiBase  = adminCfg.endpoint_url || DEFAULT_CONFIG.api_base;
+  const fm       = extra.field_map           || DEFAULT_CONFIG.field_map;
+  const actVal   = extra.active_status_value || DEFAULT_CONFIG.active_status_value;
+  const juri     = extra.jurisdiction        || DEFAULT_CONFIG.jurisdiction;
+
+  logger.info(`Fetching neighborhood associations for ${juri}...`);
+  if (adminCfg.endpoint_url) {
+    logger.info(`  (endpoint overridden by admin config: ${adminCfg.endpoint_url})`);
+  }
 
   const client = await db.connect();
   try {
@@ -168,7 +196,7 @@ async function run() {
     client.release();
   }
 
-  const features = await fromApi();
+  const features = await fromApi(apiBase, fm, actVal, juri);
   const active   = features.filter(f => f.properties.is_active).length;
   logger.info(`API returned ${features.length} neighborhoods (${active} active, ${features.length - active} inactive)`);
 
