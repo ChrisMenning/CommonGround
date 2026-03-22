@@ -19,11 +19,13 @@ function isValidId(v)   { const n = parseInt(v, 10); return Number.isFinite(n) &
 // ── Source configs ────────────────────────────────────────────────────────────
 
 // GET /admin/sources — list all source_configs
+// SECURITY: api_key is never returned. Only api_key_set (boolean) is exposed.
 router.get('/sources', async (req, res, next) => {
   try {
     const result = await db.query(`
       SELECT id, slug, municipality, endpoint_url, endpoint_format,
-             enabled, status, status_note, config_json, updated_at, updated_by
+             enabled, status, status_note, config_json, updated_at, updated_by,
+             (api_key IS NOT NULL AND api_key <> '') AS api_key_set
       FROM source_configs
       ORDER BY slug ASC, municipality ASC
     `);
@@ -34,7 +36,7 @@ router.get('/sources', async (req, res, next) => {
 // POST /admin/sources — create a new source config
 router.post('/sources', async (req, res, next) => {
   const { slug, municipality = '', endpoint_url, endpoint_format = 'json',
-          enabled = true, status = 'active', status_note, config_json } = req.body || {};
+          enabled = true, status = 'active', status_note, config_json, api_key } = req.body || {};
 
   if (!isValidSlug(slug)) {
     return res.status(400).json({ error: 'slug is required and must be lowercase alphanumeric + hyphens' });
@@ -56,6 +58,10 @@ router.post('/sources', async (req, res, next) => {
       (typeof status_note !== 'string' || status_note.length > 2000)) {
     return res.status(400).json({ error: 'status_note must be a string under 2000 characters' });
   }
+  if (api_key !== undefined && api_key !== null &&
+      (typeof api_key !== 'string' || api_key.length > 500)) {
+    return res.status(400).json({ error: 'api_key must be a string under 500 characters' });
+  }
 
   let configJsonStr = '{}';
   if (config_json !== undefined && config_json !== null) {
@@ -70,11 +76,13 @@ router.post('/sources', async (req, res, next) => {
   try {
     const result = await db.query(
       `INSERT INTO source_configs
-         (slug, municipality, endpoint_url, endpoint_format, enabled, status, status_note, config_json, updated_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, 'admin')
+         (slug, municipality, endpoint_url, endpoint_format, enabled, status, status_note, api_key, config_json, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, 'admin')
        RETURNING id`,
       [slug, municipality, endpoint_url ?? null, endpoint_format,
-       Boolean(enabled), status, status_note ?? null, configJsonStr]
+       Boolean(enabled), status, status_note ?? null,
+       (api_key && api_key.trim()) ? api_key.trim() : null,
+       configJsonStr]
     );
     res.status(201).json({ id: result.rows[0].id });
   } catch (err) {
@@ -90,7 +98,7 @@ router.put('/sources/:id', async (req, res, next) => {
   if (!isValidId(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
   const id = parseInt(req.params.id, 10);
 
-  const { endpoint_url, endpoint_format, enabled, status, status_note, config_json, municipality } = req.body || {};
+  const { endpoint_url, endpoint_format, enabled, status, status_note, config_json, municipality, api_key } = req.body || {};
   const updates = [];
   const values  = [];
 
@@ -137,6 +145,16 @@ router.put('/sources/:id', async (req, res, next) => {
       }
     }
     updates.push(`config_json = $${values.push(v)}::jsonb`);
+  }
+  // api_key: empty string = clear the key; non-empty = set new key; undefined = no change
+  if (api_key !== undefined) {
+    if (api_key !== null && typeof api_key !== 'string') {
+      return res.status(400).json({ error: 'api_key must be a string or null' });
+    }
+    if (api_key && api_key.length > 500) {
+      return res.status(400).json({ error: 'api_key must be under 500 characters' });
+    }
+    updates.push(`api_key = $${values.push((api_key && api_key.trim()) ? api_key.trim() : null)}`);
   }
 
   if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });

@@ -31,6 +31,7 @@ const db = require('./db');
  *   endpoint_format: string,
  *   status:          string,
  *   status_note:     string|null,
+ *   api_key:         string|null,
  *   config_json:     object,
  * }>}
  */
@@ -41,23 +42,37 @@ async function getSourceConfig(slug, municipality = '') {
     endpoint_format: 'json',
     status: 'active',
     status_note: null,
+    api_key: null,
     config_json: {},
+  };
+
+  // Env-var key names that take precedence over the DB value.
+  const ENV_KEY_MAP = {
+    'airnow': 'AIRNOW_API_KEY',
   };
 
   try {
     const result = await db.query(
-      `SELECT enabled, endpoint_url, endpoint_format, status, status_note, config_json
+      `SELECT enabled, endpoint_url, endpoint_format, status, status_note, api_key, config_json
        FROM source_configs
        WHERE slug = $1 AND municipality = $2
        LIMIT 1`,
       [slug, municipality]
     );
-    if (result.rows.length === 0) return DEFAULTS;
-    return { ...DEFAULTS, ...result.rows[0] };
+    const row = result.rows.length > 0 ? { ...DEFAULTS, ...result.rows[0] } : { ...DEFAULTS };
+
+    // Env var always wins over DB value
+    const envVar = ENV_KEY_MAP[slug];
+    if (envVar && process.env[envVar]) row.api_key = process.env[envVar];
+
+    return row;
   } catch (err) {
-    // If source_configs table doesn't exist (pre-migration), fall back to defaults
-    // rather than crashing the ingest run.
-    if (err.code === '42P01') return DEFAULTS; // undefined_table
+    if (err.code === '42P01') {
+      const envVar = ENV_KEY_MAP[slug];
+      const defaults = { ...DEFAULTS };
+      if (envVar && process.env[envVar]) defaults.api_key = process.env[envVar];
+      return defaults;
+    }
     throw err;
   }
 }

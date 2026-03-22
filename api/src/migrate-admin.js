@@ -153,6 +153,7 @@ async function migrate() {
         status          TEXT        NOT NULL DEFAULT 'active'
                                     CHECK (status IN ('active','degraded','blocked','pending')),
         status_note     TEXT,
+        api_key         TEXT,
         config_json     JSONB       NOT NULL DEFAULT '{}',
         updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_by      TEXT        NOT NULL DEFAULT 'system',
@@ -162,6 +163,11 @@ async function migrate() {
 
     await client.query(`
       CREATE INDEX IF NOT EXISTS source_configs_slug_idx ON source_configs(slug)
+    `);
+
+    // Add api_key column if this is an upgrade from an earlier migration
+    await client.query(`
+      ALTER TABLE source_configs ADD COLUMN IF NOT EXISTS api_key TEXT
     `);
 
     // ── Seed defaults (DO NOTHING if row already exists) ──────────────────

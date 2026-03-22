@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS source_configs (
     status          TEXT        NOT NULL DEFAULT 'active'
                                 CHECK (status IN ('active','degraded','blocked','pending')),
     status_note     TEXT,
+    api_key         TEXT,
     config_json     JSONB       NOT NULL DEFAULT '{}',
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_by      TEXT        NOT NULL DEFAULT 'system',

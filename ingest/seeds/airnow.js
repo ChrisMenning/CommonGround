@@ -14,10 +14,13 @@
 const db = require('../lib/db');
 const logger = require('../lib/logger');
 const { fetchJson, insertFeatures } = require('../lib/utils');
+const { getSourceConfig } = require('../lib/source-config');
 
 require('dotenv').config({ path: require('path').join(__dirname, '..', '..', 'api', '.env') });
 
-const API_KEY = process.env.AIRNOW_API_KEY;
+// API key resolution order (handled by getSourceConfig):
+//   1. AIRNOW_API_KEY env var
+//   2. api_key column in source_configs (set via admin interface)
 
 // Green Bay bounding box
 const BBOX = '-88.25,44.24,-87.82,44.74';
@@ -29,6 +32,9 @@ function getYesterdayDate() {
 }
 
 async function run() {
+  const cfg = await getSourceConfig('airnow');
+  const API_KEY = cfg.api_key;
+
   if (!API_KEY) {
     logger.warn('AIRNOW_API_KEY not set. Skipping AirNow ingest.');
     logger.warn('Register at: https://docs.airnowapi.org/account/request/');

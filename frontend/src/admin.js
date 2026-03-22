@@ -278,6 +278,15 @@ async function editSource(id) {
         JSON.stringify(src.config_json || {}, null, 2)
       )}</textarea>
     </div>
+    <div class="form-group">
+      <label>API KEY
+        <span class="text-muted" style="font-size:10px;margin-left:4px">${src.api_key_set ? '● currently set' : 'not set'}</span>
+      </label>
+      <input type="password" id="m-api-key"
+             placeholder="${src.api_key_set ? 'Enter new key to replace existing…' : 'Enter API key…'}"
+             autocomplete="off">
+      <div class="text-muted" style="font-size:10px;margin-top:2px">Leave blank to keep existing key. Enter a value to set or replace.</div>
+    </div>
   `, async () => {
     const payload = {
       municipality:    document.getElementById('m-municipality').value.trim(),
@@ -290,6 +299,8 @@ async function editSource(id) {
     const cfgRaw = document.getElementById('m-config-json').value.trim();
     try { payload.config_json = JSON.parse(cfgRaw || '{}'); }
     catch { toast('config_json is not valid JSON — fix and try again.', true); return false; }
+    const apiKey = document.getElementById('m-api-key').value.trim();
+    if (apiKey) payload.api_key = apiKey;
 
     await api('PUT', `/admin/sources/${id}`, payload);
     toast('Source config saved.');
@@ -358,6 +369,11 @@ document.getElementById('add-source-btn').addEventListener('click', () => {
       <label>EXTRA CONFIG JSON <span class="text-muted">(advanced)</span></label>
       <textarea id="m-config-json" style="font-family:monospace;font-size:11px">{}</textarea>
     </div>
+    <div class="form-group">
+      <label>API KEY <span class="text-muted">(optional)</span></label>
+      <input type="password" id="m-api-key" placeholder="Enter API key…" autocomplete="off">
+      <div class="text-muted" style="font-size:10px;margin-top:2px">Leave blank if this source does not require an API key.</div>
+    </div>
   `, async () => {
     const slug = document.getElementById('m-slug').value.trim();
     if (!slug) { toast('Slug is required.', true); return false; }
@@ -374,6 +390,8 @@ document.getElementById('add-source-btn').addEventListener('click', () => {
     const cfgRaw = document.getElementById('m-config-json').value.trim();
     try { payload.config_json = JSON.parse(cfgRaw || '{}'); }
     catch { toast('config_json is not valid JSON.', true); return false; }
+    const apiKey = document.getElementById('m-api-key').value.trim();
+    if (apiKey) payload.api_key = apiKey;
 
     await api('POST', '/admin/sources', payload);
     toast('Source config created.');
