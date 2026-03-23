@@ -141,7 +141,41 @@ function setStatus(msg) {
   const el = document.getElementById('status-msg');
   if (el) el.textContent = msg;
 }
+// ── App Bar ───────────────────────────────────────────────────────────────────────────────
 
+(function initAppBar() {
+  const sidePanel = document.getElementById('side-panel');
+  const btns = Array.from(document.querySelectorAll('.app-bar-btn'));
+  let activePanel = null;
+
+  function openPanel(id) {
+    activePanel = id;
+    btns.forEach(b => {
+      const on = b.dataset.panel === id;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    const p = document.getElementById(`panel-${id}`);
+    if (p) p.classList.add('active');
+    sidePanel.classList.add('open');
+  }
+
+  function closePanel() {
+    activePanel = null;
+    btns.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    sidePanel.classList.remove('open');
+  }
+
+  btns.forEach(btn => btn.addEventListener('click', () => {
+    btn.dataset.panel === activePanel ? closePanel() : openPanel(btn.dataset.panel);
+  }));
+
+  document.querySelectorAll('.panel-close').forEach(btn => btn.addEventListener('click', closePanel));
+
+  openPanel('layers'); // default
+}());
 // ── organize.directory panel ──────────────────────────────────────────────────
 // Fetches the Green Bay page from organize.directory and renders a list of
 // groups in the sidebar panel. Falls back gracefully if the fetch fails.

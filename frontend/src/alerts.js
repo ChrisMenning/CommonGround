@@ -9,7 +9,7 @@
  */
 'use strict';
 import { apiFetch, bboxFromMap } from './api-client.js';
-import { enableLayerBySlug, openDrawerWithContent } from './layers.js';
+import { enableLayerBySlug, openDrawerWithContent, closeDrawer } from './layers.js';
 
 /* global maplibregl */
 
@@ -82,7 +82,7 @@ function renderAlertSidebar(alerts) {
     return;
   }
 
-  badge.style.display = '';
+  badge.style.display = 'inline-block';
   badge.textContent = String(alerts.length);
   const minSeverity = Math.min(...alerts.map(a => a.severity));
   _setAlertIndicator(true, minSeverity);
@@ -228,6 +228,13 @@ function toggleAlertMap(alert, itemEl) {
   // Point markers don't use MapLibre layers — toggle display directly
   const marker = _alertMarkerMap.get(alert.id);
   if (marker) marker.getElement().style.display = isVisible ? '' : 'none';
+
+  // Open the drawer when turned on; close it when turned off
+  if (isVisible) {
+    showAlertDetail(alert);
+  } else {
+    closeDrawer();
+  }
 }
 
 function showAlertDetail(alert) {

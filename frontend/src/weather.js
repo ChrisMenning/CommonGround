@@ -131,7 +131,7 @@ function renderWeather(data) {
   if (badgeEl) {
     if (nwsAlerts.length > 0) {
       badgeEl.textContent = `${nwsAlerts.length} NWS ALERT${nwsAlerts.length > 1 ? 'S' : ''}`;
-      badgeEl.style.display = '';
+      badgeEl.style.display = 'inline-block';
       badgeEl.title = nwsAlerts.map(a => escHtml(a.headline || a.event)).join('\n');
     } else {
       badgeEl.style.display = 'none';

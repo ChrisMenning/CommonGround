@@ -591,7 +591,7 @@ async function addMapLayer(layer) {
       type: 'circle',
       source: sourceId,
       paint: {
-        'circle-radius':         layer.slug === 'airnow' ? 19 : 9,
+        'circle-radius':         layer.slug === 'airnow' ? 20 : 11,
         'circle-color':          layer.color || '#7FA843',
         'circle-opacity':        layer.slug === 'airnow' ? 0.9 : 0.85,
         'circle-stroke-width':   layer.slug === 'airnow' ? 2 : 1.5,
@@ -618,7 +618,7 @@ async function addMapLayer(layer) {
         source: sourceId,
         layout: {
           'icon-image':            iconImageExpr,
-          'icon-size':             layer.slug === 'airnow' ? 1.25 : 1.0,
+          'icon-size':             layer.slug === 'airnow' ? 0.9 : 0.6,
           'icon-allow-overlap':    true,
           'icon-ignore-placement': true,
         },
@@ -807,7 +807,7 @@ function initDrawer(map) {
   });
 }
 
-function closeDrawer() {
+export function closeDrawer() {
   if (_drawerEl) _drawerEl.style.transform = 'translateX(100%)';
   if (_drawerCloseCallback) { _drawerCloseCallback(); _drawerCloseCallback = null; }
 }
